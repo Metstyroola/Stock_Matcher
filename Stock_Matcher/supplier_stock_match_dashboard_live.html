@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tyroola — Supplier Stock Mapping Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink: #16211f;
+    --paper: #f6f5f1;
+    --panel: #ffffff;
+    --line: #e2e0d8;
+    --muted: #6b6f68;
+    --matched: #1f7a6c;
+    --matched-soft: #d9ece7;
+    --unmatched: #c76a2e;
+    --unmatched-soft: #fbe6d6;
+    --accent: #16211f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 28px 64px; }
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .masthead h1 {
+    font-size: 28px;
+    margin: 0;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+  }
+  .masthead .subtitle {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 4px;
+    max-width: 560px;
+    line-height: 1.5;
+  }
+  .masthead .meta {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 16px 20px;
+  }
+  .stat .label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .stat .value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .value.matched { color: var(--matched); }
+  .stat .value.unmatched { color: var(--unmatched); }
+  .stat .sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  .controls .note {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .toggle-group {
+    display: inline-flex;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .toggle-group button {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: none;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .toggle-group button.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  #search {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 7px 10px;
+    width: 180px;
+    background: var(--panel);
+  }
+
+  .chart-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 20px 22px 8px;
+  }
+  #chartHeight { position: relative; }
+
+  .view-toggle { display: inline-flex; border: 1px solid var(--ink); border-radius: 3px; overflow: hidden; }
+  .view-toggle button {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: none;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .view-toggle button.active { background: var(--ink); color: var(--paper); }
+
+  .view-panel { display: none; }
+  .view-panel.active { display: block; }
+
+  table.rank-table { width: 100%; border-collapse: collapse; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12.5px; }
+  table.rank-table thead th { background: var(--ink); color: var(--paper); text-align: left; padding: 10px 14px; }
+  table.rank-table thead th.num { text-align: right; }
+  table.rank-table tbody td { padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  table.rank-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .legend-row {
+    display: flex;
+    gap: 20px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 12px 4px 4px;
+  }
+  .legend-row span.dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 2px;
+    margin-right: 6px;
+  }
+
+  .footnote {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 18px;
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  .drilldown {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--ink);
+    margin-top: 16px;
+    padding: 16px 22px 12px;
+  }
+  .drilldown.active { display: block; }
+  .drilldown-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+  .drilldown-head h2 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 700;
+  }
+  .drilldown-head .dd-sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .drilldown-close {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--ink);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  #ddChartHeight { position: relative; }
+  .bar-row { cursor: pointer; }
+  .bar-row:hover td { background: #eef0ec; }
+  .live-status { display:inline-block; font-size:10.5px; margin-top:6px; text-transform:none; letter-spacing:0; }
+  .live-status.ok { color: var(--matched); }
+  .live-status.err { color: var(--unmatched); }
+  .refresh-btn { font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; border:1px solid var(--ink); background:var(--panel); color:var(--ink); padding:4px 10px; margin-left:8px; cursor:pointer; border-radius:3px; }
+  .refresh-btn:hover { background: var(--ink); color: var(--paper); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>Supplier Stock Mapping Report</h1>
+      <div class="subtitle">Mapped vs. not mapped live stock rows, by supplier, across the active tyre catalog. Zero-stock rows and soft-deleted SKUs excluded; 30 low-priority or duplicate supplier accounts filtered from the base set. Chapel Corner has known non-tyre accessory SKUs (valves, wheel weights, sockets, etc.) removed via a user-identified exclusion list; all genuine tyre products — mapped or not — remain.</div>
+    </div>
+    <div class="meta">heroic-ruler-198603<br>xx_development.popeye_production_au_public_supplier_stock<br>
+      <span id="liveStatus" class="live-status">Loading…</span>
+      <button id="refreshBtn" class="refresh-btn" type="button">Refresh</button>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Suppliers</div>
+      <div class="value" id="statSuppliers">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Total in-stock rows</div>
+      <div class="value" id="statTotal">—</div>
+    </div>
+    <div class="stat">
+      <div class="label">Mapped</div>
+      <div class="value matched" id="statMatched">—</div>
+      <div class="sub" id="statMatchedPct"></div>
+    </div>
+    <div class="stat">
+      <div class="label">Not Mapped</div>
+      <div class="value unmatched" id="statUnmatched">—</div>
+      <div class="sub" id="statUnmatchedPct"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="note">Hover a bar for exact counts and not mapped rate. Click a supplier to see its location breakdown.</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="view-toggle">
+        <button id="viewChart" class="active">Chart</button>
+        <button id="viewTable">Table</button>
+      </div>
+      <input id="search" type="text" placeholder="Filter supplier…">
+      <div class="toggle-group">
+        <button id="sortTotal" class="active">Sort: total rows</button>
+        <button id="sortRate">Sort: not mapped %</button>
+        <button id="sortAlpha">Sort: A–Z</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-panel active" id="panelChart">
+    <div class="chart-panel">
+      <div id="chartHeight">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="legend-row">
+        <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+        <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-panel" id="panelTable">
+    <div class="chart-panel" style="padding:0; overflow-x:auto;">
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th>Supplier</th>
+            <th class="num">Total rows</th>
+            <th class="num">Mapped</th>
+            <th class="num">Not Mapped</th>
+            <th class="num">Not Mapped %</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="drilldown" id="drilldown">
+    <div class="drilldown-head">
+      <div>
+        <h2 id="ddTitle">Supplier</h2>
+        <div class="dd-sub" id="ddSub"></div>
+      </div>
+      <button class="drilldown-close" id="ddClose">Close ×</button>
+    </div>
+    <div id="ddChartHeight">
+      <canvas id="ddChart"></canvas>
+    </div>
+    <div class="legend-row">
+      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <strong>Live</strong> — queried directly from <code>xx_development.popeye_production_au_public_supplier_stock</code> each time this page loads (click Refresh to re-query). Basis: <code>match_status</code> filtered to <code>qty &gt; 0</code>, <code>supplier_pid NOT LIKE 'DELETED\_%'</code>, restricted to the curated 31-supplier account set (30 low-priority/duplicate accounts excluded). Note: unlike the original static snapshot, the Chapel Corner non-tyre accessory SKUs are <em>not</em> removed here (that was a manual SKU-level exclusion), so Chapel Corner's not-mapped count runs a little higher. The source table is a periodic refresh, not a real-time feed — see the refresh timestamp above.
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var data = [];
+
+  var canvas = document.getElementById('chart');
+  var chart;
+  var ddChart;
+  var currentSort = 'total';
+  var filterText = '';
+
+  function computeRows() {
+    var rows = data.filter(function (d) {
+      return d.key.toLowerCase().indexOf(filterText.toLowerCase()) !== -1;
+    });
+    rows = rows.slice().sort(function (a, b) {
+      if (currentSort === 'rate') return b.rate - a.rate;
+      if (currentSort === 'alpha') return a.key.localeCompare(b.key);
+      return b.total - a.total;
+    });
+    return rows;
+  }
+
+  function render() {
+    var rows = computeRows();
+    var barHeight = 24;
+    document.getElementById('chartHeight').style.height = Math.max(rows.length * barHeight + 40, 120) + 'px';
+
+    var labels = rows.map(function (d) { return d.key; });
+    var matched = rows.map(function (d) { return d.matched; });
+    var unmatched = rows.map(function (d) { return d.unmatched; });
+
+    if (chart) chart.destroy();
+    chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Mapped', data: matched, backgroundColor: '#1f7a6c', stack: 's', borderRadius: 1 },
+          { label: 'Not Mapped', data: unmatched, backgroundColor: '#c76a2e', stack: 's', borderRadius: 1 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: '#e2e0d8' },
+            title: { display: true, text: 'Stock rows (qty > 0)', font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 10 } }
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            bodyFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            callbacks: {
+              afterBody: function (items) {
+                var idx = items[0].dataIndex;
+                var d = rows[idx];
+                return ['', 'Total: ' + d.total.toLocaleString() + ' rows', 'Not mapped rate: ' + d.rate.toFixed(1) + '%'];
+              }
+            }
+          }
+        },
+        onClick: function (evt, elements) {
+          if (!elements.length) return;
+          var idx = elements[0].index;
+          showDrilldown(rows[idx]);
+        },
+        onHover: function (evt, elements) {
+          canvas.style.cursor = elements.length ? 'pointer' : 'default';
+        }
+      }
+    });
+  }
+
+  function renderTable() {
+    var rows = computeRows();
+    var body = document.getElementById('tableBody');
+    body.innerHTML = '';
+    rows.forEach(function (d, i) {
+      var tr = document.createElement('tr');
+      tr.className = 'bar-row';
+      tr.style.background = i % 2 === 0 ? '#ffffff' : '#f6f5f1';
+      var boldRate = d.rate > 30 ? 'font-weight:700;' : '';
+      tr.innerHTML =
+        '<td>' + d.key + '</td>' +
+        '<td class="num">' + d.total.toLocaleString() + '</td>' +
+        '<td class="num" style="color:#1f7a6c;">' + d.matched.toLocaleString() + '</td>' +
+        '<td class="num" style="color:#c76a2e;">' + d.unmatched.toLocaleString() + '</td>' +
+        '<td class="num" style="' + boldRate + '">' + d.rate.toFixed(1) + '%</td>';
+      tr.addEventListener('click', function () { showDrilldown(d); });
+      body.appendChild(tr);
+    });
+  }
+
+  function showDrilldown(d) {
+    var locs = (d.locations || []).slice().sort(function (a, b) { return b.total - a.total; });
+    locs.forEach(function (l) { l.rate = l.total ? (l.unmatched / l.total * 100) : 0; });
+
+    document.getElementById('ddTitle').textContent = d.key;
+    document.getElementById('ddSub').textContent = locs.length + (locs.length === 1 ? ' location' : ' locations') +
+      ' — ' + d.total.toLocaleString() + ' rows, ' + d.rate.toFixed(1) + '% not mapped overall';
+
+    var ddCanvas = document.getElementById('ddChart');
+    document.getElementById('ddChartHeight').style.height = Math.max(locs.length * 26 + 40, 100) + 'px';
+
+    var labels = locs.map(function (l) { return l.name; });
+    var matchedArr = locs.map(function (l) { return l.matched; });
+    var unmatchedArr = locs.map(function (l) { return l.unmatched; });
+
+    if (ddChart) ddChart.destroy();
+    ddChart = new Chart(ddCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Mapped', data: matchedArr, backgroundColor: '#1f7a6c', stack: 's', borderRadius: 1 },
+          { label: 'Not Mapped', data: unmatchedArr, backgroundColor: '#c76a2e', stack: 's', borderRadius: 1 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 200 },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: '#e2e0d8' },
+            title: { display: true, text: 'Stock rows (qty > 0)', font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 10 } }
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            bodyFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            callbacks: {
+              afterBody: function (items) {
+                var idx = items[0].dataIndex;
+                var l = locs[idx];
+                return ['', 'Total: ' + l.total.toLocaleString() + ' rows', 'Not mapped rate: ' + l.rate.toFixed(1) + '%'];
+              }
+            }
+          }
+        }
+      }
+    });
+
+    document.getElementById('drilldown').classList.add('active');
+    document.getElementById('drilldown').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.getElementById('ddClose').addEventListener('click', function () {
+    document.getElementById('drilldown').classList.remove('active');
+  });
+
+  function computeRate() {
+    data.forEach(function (d) { d.rate = d.total ? (d.unmatched / d.total * 100) : 0; });
+  }
+  function fmt(n) { return (n || 0).toLocaleString(); }
+  function updateStats() {
+    var t = data.reduce(function (a, d) {
+      a.matched += d.matched; a.unmatched += d.unmatched; a.total += d.total; return a;
+    }, { matched: 0, unmatched: 0, total: 0 });
+    document.getElementById('statSuppliers').textContent = data.length;
+    document.getElementById('statTotal').textContent = fmt(t.total);
+    document.getElementById('statMatched').textContent = fmt(t.matched);
+    document.getElementById('statUnmatched').textContent = fmt(t.unmatched);
+    document.getElementById('statMatchedPct').textContent = t.total ? (t.matched / t.total * 100).toFixed(1) + '% of total' : '';
+    document.getElementById('statUnmatchedPct').textContent = t.total ? (t.unmatched / t.total * 100).toFixed(1) + '% of total' : '';
+  }
+  function setStatus(msg, kind) {
+    var el = document.getElementById('liveStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'live-status ' + (kind || '');
+  }
+  function loadData() {
+    setStatus('Loading live data…', '');
+    fetch('/api/stock-mapping', { cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j || res.j.ok === false) {
+          throw new Error((res.j && res.j.error) || ('HTTP ' + res.status));
+        }
+        data = res.j.data || [];
+        computeRate();
+        updateStats();
+        render();
+        renderTable();
+        var when = res.j.refreshed_at ? new Date(res.j.refreshed_at).toLocaleString() : 'unknown';
+        setStatus('Live · source last refreshed ' + when, 'ok');
+      })
+      .catch(function (err) {
+        setStatus('Could not load live data: ' + err.message + ' — make sure StockMatch is running and BigQuery auth is set up.', 'err');
+      });
+  }
+  document.getElementById('refreshBtn').addEventListener('click', loadData);
+  loadData();
+
+  document.getElementById('search').addEventListener('input', function (e) {
+    filterText = e.target.value;
+    render();
+    renderTable();
+  });
+
+  function setActive(id) {
+    ['sortTotal', 'sortRate', 'sortAlpha'].forEach(function (b) {
+      document.getElementById(b).classList.toggle('active', b === id);
+    });
+  }
+  document.getElementById('sortTotal').addEventListener('click', function () { currentSort = 'total'; setActive('sortTotal'); render(); renderTable(); });
+  document.getElementById('sortRate').addEventListener('click', function () { currentSort = 'rate'; setActive('sortRate'); render(); renderTable(); });
+  document.getElementById('sortAlpha').addEventListener('click', function () { currentSort = 'alpha'; setActive('sortAlpha'); render(); renderTable(); });
+
+  document.getElementById('viewChart').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('viewTable').classList.remove('active');
+    document.getElementById('panelChart').classList.add('active');
+    document.getElementById('panelTable').classList.remove('active');
+  });
+  document.getElementById('viewTable').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('viewChart').classList.remove('active');
+    document.getElementById('panelTable').classList.add('active');
+    document.getElementById('panelChart').classList.remove('active');
+  });
+})();
+</script>
+</body>
+</html>

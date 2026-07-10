@@ -1,0 +1,81 @@
+SLACK / SHORT VERSION
+---------------------
+Hey alepuri — I opened a PR adding a "Stock Matching" dashboard under Marketing
+in betty-boop:
+
+  https://github.com/alepuri/betty-boop/pull/new/claude/emets-stock-matching-marketing
+  (branch: claude/emets-stock-matching-marketing)
+
+It's a frozen-snapshot dashboard (supplier stock-mapping coverage — mapped vs
+not-mapped in-stock rows by supplier, with a location drill-down), added
+entirely under the analyst-writable web/dashboards/ path — no server/ or
+registry changes needed.
+
+Two things I need from you:
+1. Review + merge the PR (preview evidence + validation notes are in the
+   description).
+2. Stage the real snapshot data to GCS so it shows real numbers instead of the
+   "missing" banner — two small files, exact command in
+   stock-matching-gcs-staging/README.txt (attached). Needs bucket write access
+   to gs://betty-boop-data/stock-matching/.
+
+Also — could you add me as a collaborator on the repo (GitHub: Metstyroola)?
+I'd like to be able to push future dashboards myself.
+
+Thanks!
+
+
+EMAIL / LONGER VERSION
+----------------------
+Subject: PR: new "Stock Matching" dashboard (Marketing) + GCS staging needed
+
+Hi alepuri,
+
+I've opened a PR against betty-boop adding a new "Stock Matching" dashboard
+under the Marketing category:
+
+  PR branch: claude/emets-stock-matching-marketing
+  Open here: https://github.com/alepuri/betty-boop/pull/new/claude/emets-stock-matching-marketing
+  Commit: 4669e11a369edb73811de7b657d7da574a96c48c
+
+What it is: supplier stock-mapping coverage — mapped vs not-mapped in-stock
+rows by supplier, with a per-location drill-down. Point-in-time snapshot
+(frozen 2026-07-01), matching the pattern used by ai-readiness / rtb-ab.
+
+Everything in the PR sits under the analyst-writable web/dashboards/ path —
+I didn't touch server/, the registry, or any build config. I ran both
+validators locally before pushing:
+  - python -m server.registry --validate  -> OK
+  - python scripts/verify_manifest.py     -> stock-matching data/ matches MANIFEST
+
+Two things I need from you:
+
+1. Review + merge. The PR description includes the required preview-evidence
+   section (rendered locally, screenshot verified, KPIs/table/chart all
+   checked against the source query).
+
+2. Stage the real data to GCS. The dashboard's data/ files are gitignored per
+   the platform's data rules, so the real snapshot isn't in the PR — it needs
+   to land in gs://betty-boop-data/stock-matching/ for the container build to
+   pick it up. I've attached the two files (meta.js, suppliers.js) plus a
+   README with the exact gsutil command and the SHA-256 hashes the MANIFEST
+   expects them to match. This needs your (or an analyst's) bucket write
+   access — I don't have it.
+
+One caveat noted in the dashboard and MANIFEST: this snapshot doesn't strip
+Chapel Corner's non-tyre accessory SKUs (valves, wheel weights, sockets) the
+way an earlier hand-curated cut did, so its not-mapped count runs about 1,773
+higher. Every other supplier reconciles exactly against the original numbers.
+
+Longer term: this is a frozen snapshot, not live, because the source dataset
+(xx_development) isn't on the transforms source allowlist yet. If it's worth
+making genuinely live, that would need the dataset allowlisted, a mart built,
+and a server route added — all platform-owner work, so let me know if you
+want to scope that separately.
+
+Also — could you add me as a collaborator on the repo (GitHub: Metstyroola)?
+That way I can push future dashboards directly instead of routing PRs through
+you every time.
+
+Thanks!
+Emeterio

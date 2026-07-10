@@ -1,0 +1,7 @@
+# Local secrets / credentials — never commit a real .env
+Stock_Matcher/.env
+
+# Local scratch / temp
+*.log
+.DS_Store
+Thumbs.db

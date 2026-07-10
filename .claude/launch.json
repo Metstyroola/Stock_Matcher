@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stockmatch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["Stock_Matcher/server.js"],
+      "port": 3000
+    }
+  ]
+}

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tyroola — Supplier Stock Mapping Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink: #16211f;
+    --paper: #f6f5f1;
+    --panel: #ffffff;
+    --line: #e2e0d8;
+    --muted: #6b6f68;
+    --matched: #1f7a6c;
+    --matched-soft: #d9ece7;
+    --unmatched: #c76a2e;
+    --unmatched-soft: #fbe6d6;
+    --accent: #16211f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 28px 64px; }
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .masthead h1 {
+    font-size: 28px;
+    margin: 0;
+    letter-spacing: -0.01em;
+    font-weight: 700;
+  }
+  .masthead .subtitle {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 4px;
+    max-width: 560px;
+    line-height: 1.5;
+  }
+  .masthead .meta {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 16px 20px;
+  }
+  .stat .label {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .stat .value {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .value.matched { color: var(--matched); }
+  .stat .value.unmatched { color: var(--unmatched); }
+  .stat .sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+  }
+  .controls .note {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .toggle-group {
+    display: inline-flex;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .toggle-group button {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: none;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .toggle-group button.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  #search {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 7px 10px;
+    width: 180px;
+    background: var(--panel);
+  }
+
+  .chart-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 20px 22px 8px;
+  }
+  #chartHeight { position: relative; }
+
+  .view-toggle { display: inline-flex; border: 1px solid var(--ink); border-radius: 3px; overflow: hidden; }
+  .view-toggle button {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: none;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .view-toggle button.active { background: var(--ink); color: var(--paper); }
+
+  .view-panel { display: none; }
+  .view-panel.active { display: block; }
+
+  table.rank-table { width: 100%; border-collapse: collapse; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12.5px; }
+  table.rank-table thead th { background: var(--ink); color: var(--paper); text-align: left; padding: 10px 14px; }
+  table.rank-table thead th.num { text-align: right; }
+  table.rank-table tbody td { padding: 8px 14px; border-bottom: 1px solid var(--line); }
+  table.rank-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .legend-row {
+    display: flex;
+    gap: 20px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 12px 4px 4px;
+  }
+  .legend-row span.dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 2px;
+    margin-right: 6px;
+  }
+
+  .footnote {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 18px;
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  .drilldown {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--ink);
+    margin-top: 16px;
+    padding: 16px 22px 12px;
+  }
+  .drilldown.active { display: block; }
+  .drilldown-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+  .drilldown-head h2 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 700;
+  }
+  .drilldown-head .dd-sub {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .drilldown-close {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--ink);
+    background: var(--panel);
+    color: var(--ink);
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  #ddChartHeight { position: relative; }
+  .bar-row { cursor: pointer; }
+  .bar-row:hover td { background: #eef0ec; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>Supplier Stock Mapping Report</h1>
+      <div class="subtitle">Mapped vs. not mapped live stock rows, by supplier, across the active tyre catalog. Zero-stock rows and soft-deleted SKUs excluded; 30 low-priority or duplicate supplier accounts filtered from the base set. Chapel Corner has known non-tyre accessory SKUs (valves, wheel weights, sockets, etc.) removed via a user-identified exclusion list; all genuine tyre products — mapped or not — remain.</div>
+    </div>
+    <div class="meta">heroic-ruler-198603<br>xx_development.popeye_production_au_public_supplier_stock</div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">Suppliers</div>
+      <div class="value">31</div>
+    </div>
+    <div class="stat">
+      <div class="label">Total in-stock rows</div>
+      <div class="value">101,957</div>
+    </div>
+    <div class="stat">
+      <div class="label">Mapped</div>
+      <div class="value matched">90,232</div>
+      <div class="sub">88.5% of total</div>
+    </div>
+    <div class="stat">
+      <div class="label">Not Mapped</div>
+      <div class="value unmatched">11,725</div>
+      <div class="sub">11.5% of total</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="note">Hover a bar for exact counts and not mapped rate. Click a supplier to see its location breakdown.</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="view-toggle">
+        <button id="viewChart" class="active">Chart</button>
+        <button id="viewTable">Table</button>
+      </div>
+      <input id="search" type="text" placeholder="Filter supplier…">
+      <div class="toggle-group">
+        <button id="sortTotal" class="active">Sort: total rows</button>
+        <button id="sortRate">Sort: not mapped %</button>
+        <button id="sortAlpha">Sort: A–Z</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-panel active" id="panelChart">
+    <div class="chart-panel">
+      <div id="chartHeight">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="legend-row">
+        <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+        <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view-panel" id="panelTable">
+    <div class="chart-panel" style="padding:0; overflow-x:auto;">
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th>Supplier</th>
+            <th class="num">Total rows</th>
+            <th class="num">Mapped</th>
+            <th class="num">Not Mapped</th>
+            <th class="num">Not Mapped %</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="drilldown" id="drilldown">
+    <div class="drilldown-head">
+      <div>
+        <h2 id="ddTitle">Supplier</h2>
+        <div class="dd-sub" id="ddSub"></div>
+      </div>
+      <button class="drilldown-close" id="ddClose">Close ×</button>
+    </div>
+    <div id="ddChartHeight">
+      <canvas id="ddChart"></canvas>
+    </div>
+    <div class="legend-row">
+      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    Query basis: <code>match_status</code> from the native supplier-stock table, joined to <code>Sales_Dashboard_Views.suppliers_check_dashboard_table</code> for supplier keys. Filtered to <code>qty &gt; 0</code>, <code>supplier_pid NOT LIKE 'DELETED\_%'</code>. This source table is a static snapshot rather than a live feed — treat rates as directional, not real-time.
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var data = [
+    {key:"tempetyres", matched:28306, unmatched:2214, total:30520, locations:[{name:"Tempetyres VIC", matched:6869, unmatched:702, total:7571}, {name:"Tempetyres QLD", matched:6397, unmatched:665, total:7062}, {name:"Tempetyres NSW", matched:5701, unmatched:622, total:6323}, {name:"Tempetyres", matched:3688, unmatched:4, total:3692}, {name:"Tempetyres SA", matched:2911, unmatched:105, total:3016}, {name:"Tempetyres WA", matched:2731, unmatched:89, total:2820}, {name:"Tempetyres Special NSW", matched:5, unmatched:27, total:32}, {name:"Tempetyres Special VIC", matched:2, unmatched:0, total:2}, {name:"Tempetyres Special SA", matched:1, unmatched:0, total:1}, {name:"Tempetyres Special WA", matched:1, unmatched:0, total:1}]},
+    {key:"totaltyres", matched:8867, unmatched:4, total:8871, locations:[{name:"Total Tyres Virtual VIC", matched:2429, unmatched:1, total:2430}, {name:"Total Tyres Virtual NSW", matched:2262, unmatched:1, total:2263}, {name:"Total Tyres Virtual WA", matched:1961, unmatched:1, total:1962}, {name:"Total Tyres Virtual QLD", matched:1894, unmatched:0, total:1894}, {name:"Total Tyres Virtual SA", matched:301, unmatched:1, total:302}, {name:"Total Tyres VIC", matched:8, unmatched:0, total:8}, {name:"Total Tyres WA", matched:4, unmatched:0, total:4}, {name:"Total Tyres NSW", matched:3, unmatched:0, total:3}, {name:"Total Tyres TOW", matched:2, unmatched:0, total:2}, {name:"Total Tyres TAS", matched:2, unmatched:0, total:2}, {name:"Total Tyres SA", matched:1, unmatched:0, total:1}]},
+    {key:"yhi", matched:6255, unmatched:1753, total:8008, locations:[{name:"Yhi NSW", matched:1793, unmatched:598, total:2391}, {name:"Yhi QLD", matched:1272, unmatched:354, total:1626}, {name:"Yhi VIC", matched:1273, unmatched:343, total:1616}, {name:"Yhi WA", matched:969, unmatched:265, total:1234}, {name:"Yhi SA", matched:583, unmatched:122, total:705}, {name:"Yhi TAS", matched:365, unmatched:71, total:436}]},
+    {key:"newbee", matched:5015, unmatched:1004, total:6019, locations:[{name:"Newbee NSW Tyres Virtual", matched:1374, unmatched:299, total:1673}, {name:"Newbee NSW", matched:1338, unmatched:295, total:1633}, {name:"Newbee QLD Tyres", matched:1163, unmatched:219, total:1382}, {name:"Newbee VIC Tyres", matched:786, unmatched:167, total:953}, {name:"Newbee Wollongong Tyres", matched:354, unmatched:24, total:378}]},
+    {key:"goodride", matched:4172, unmatched:640, total:4812, locations:[{name:"Goodride NSW Riverwood", matched:928, unmatched:630, total:1558}, {name:"Goodride", matched:662, unmatched:2, total:664}, {name:"Goodride NSW Padstow", matched:660, unmatched:2, total:662}, {name:"Goodride NSW Gosford", matched:642, unmatched:2, total:644}, {name:"Goodride ACT", matched:642, unmatched:2, total:644}, {name:"Goodride NSW Wollongong", matched:638, unmatched:2, total:640}]},
+    {key:"yokohama", matched:4200, unmatched:0, total:4200, locations:[{name:"Yokohama NSW", matched:914, unmatched:0, total:914}, {name:"Yokohama VIC", matched:890, unmatched:0, total:890}, {name:"Yokohama QLD Brisbane", matched:854, unmatched:0, total:854}, {name:"Yokohama WA", matched:795, unmatched:0, total:795}, {name:"Yokohama NT", matched:289, unmatched:0, total:289}, {name:"Yokohama QLD Townsville", matched:281, unmatched:0, total:281}, {name:"Yokohama SA", matched:177, unmatched:0, total:177}]},
+    {key:"neta", matched:3511, unmatched:167, total:3678, locations:[{name:"Neta Tyres Brisbane Qld", matched:521, unmatched:30, total:551}, {name:"Neta Tyres Gold Coast Qld", matched:515, unmatched:25, total:540}, {name:"Neta Tyres Rockhampton Qld", matched:511, unmatched:22, total:533}, {name:"Neta Tyres Cairns Qld", matched:499, unmatched:23, total:522}, {name:"Neta Tyres Toowoomba Qld", matched:497, unmatched:21, total:518}, {name:"Neta Tyres Sunshine Coast Qld", matched:489, unmatched:23, total:512}, {name:"Neta Tyres Lismore Nsw", matched:479, unmatched:23, total:502}]},
+    {key:"pirelli", matched:2831, unmatched:0, total:2831, locations:[{name:"Pirelli NSW", matched:791, unmatched:0, total:791}, {name:"Pirelli VIC", matched:791, unmatched:0, total:791}, {name:"Pirelli QLD", matched:790, unmatched:0, total:790}, {name:"Pirelli WA", matched:459, unmatched:0, total:459}]},
+    {key:"tyreconnect", matched:2788, unmatched:14, total:2802, locations:[{name:"Tyre Connect", matched:2788, unmatched:14, total:2802}]},
+    {key:"hankook", matched:2661, unmatched:31, total:2692, locations:[{name:"Hankook WA", matched:565, unmatched:1, total:566}, {name:"Hankook NSW", matched:563, unmatched:0, total:563}, {name:"Hankook VIC", matched:549, unmatched:0, total:549}, {name:"Hankook QLD", matched:532, unmatched:0, total:532}, {name:"Hankook SA", matched:452, unmatched:30, total:482}]},
+    {key:"chapelcorner", matched:1136, unmatched:1520, total:2656, locations:[{name:"Chapel Corner RPM", matched:143, unmatched:1173, total:1316}, {name:"Chapel Corner Goodyear", matched:353, unmatched:254, total:607}, {name:"Chapel Corner Virtual", matched:367, unmatched:23, total:390}, {name:"Chapel Corner Megabus", matched:138, unmatched:35, total:173}, {name:"Chapel Corner MPS", matched:135, unmatched:35, total:170}]},
+    {key:"logictyres", matched:2612, unmatched:40, total:2652, locations:[{name:"Logic Kumho WA", matched:496, unmatched:7, total:503}, {name:"Logic Kumho VIC", matched:470, unmatched:7, total:477}, {name:"Logic Kumho QLD", matched:462, unmatched:6, total:468}, {name:"Logic Kumho NSW Marsden Park", matched:456, unmatched:7, total:463}, {name:"Logic Kumho SA", matched:397, unmatched:6, total:403}, {name:"Logic Tyres NSW Seven Hills", matched:331, unmatched:7, total:338}]},
+    {key:"continental", matched:2406, unmatched:13, total:2419, locations:[{name:"Continental Tyres WA", matched:614, unmatched:1, total:615}, {name:"Continental Tyres QLD", matched:599, unmatched:6, total:605}, {name:"Continental Tyres VIC", matched:600, unmatched:1, total:601}, {name:"Continental Tyres NSW", matched:593, unmatched:5, total:598}]},
+    {key:"toptyres", matched:2223, unmatched:116, total:2339, locations:[{name:"Toptyres QLD", matched:1027, unmatched:45, total:1072}, {name:"Toptyres NSW", matched:473, unmatched:15, total:488}, {name:"Toptyres TOW", matched:393, unmatched:12, total:405}, {name:"Toptyres SA", matched:330, unmatched:44, total:374}]},
+    {key:"cypresstyres", matched:1746, unmatched:363, total:2109, locations:[{name:"Cypress Tyres Qld Brisbane", matched:761, unmatched:181, total:942}, {name:"Cypress Tyres Nsw", matched:548, unmatched:93, total:641}, {name:"Cypress Tyres Qld Gold Coast", matched:250, unmatched:24, total:274}, {name:"Cypress Tyres VIC Pty Ltd", matched:187, unmatched:65, total:252}]},
+    {key:"tyreprofessionals", matched:1565, unmatched:498, total:2063, locations:[{name:"The Tyre Professionals Virtual", matched:842, unmatched:249, total:1091}, {name:"The Tyre Professionals", matched:723, unmatched:249, total:972}]},
+    {key:"freedomtyres", matched:1309, unmatched:606, total:1915, locations:[{name:"Freedom Tyres VIC", matched:387, unmatched:147, total:534}, {name:"Freedom Tyres QLD", matched:327, unmatched:163, total:490}, {name:"Freedom Tyres NSW", matched:284, unmatched:168, total:452}, {name:"Freedom Tyres WA", matched:311, unmatched:128, total:439}]},
+    {key:"onyx", matched:1323, unmatched:489, total:1812, locations:[{name:"Onyx Vic", matched:684, unmatched:184, total:868}, {name:"Onyx Tyres Qld Brisbane", matched:196, unmatched:281, total:477}, {name:"OLD Onyx Tyres NSW", matched:260, unmatched:14, total:274}, {name:"OLD Onyx Tyres Qld Gold Coast", matched:114, unmatched:2, total:116}, {name:"Onyx Qld Sunshine Coast", matched:69, unmatched:8, total:77}]},
+    {key:"tyregenie", matched:1531, unmatched:5, total:1536, locations:[{name:"Tyregenie", matched:1531, unmatched:5, total:1536}]},
+    {key:"stgeorge", matched:799, unmatched:696, total:1495, locations:[{name:"St George Tyres", matched:799, unmatched:696, total:1495}]},
+    {key:"tyrenetwork", matched:960, unmatched:208, total:1168, locations:[{name:"Tyrenetwork VIC", matched:393, unmatched:101, total:494}, {name:"Tyrenetwork QLD", matched:296, unmatched:104, total:400}, {name:"Tyrenetwork", matched:178, unmatched:0, total:178}, {name:"Tyrenetwork NSW", matched:92, unmatched:2, total:94}, {name:"Tyrenetwork SA", matched:1, unmatched:1, total:2}]},
+    {key:"superior", matched:575, unmatched:343, total:918, locations:[{name:"Superior Tyres", matched:575, unmatched:343, total:918}]},
+    {key:"bsatyres", matched:691, unmatched:86, total:777, locations:[{name:"BSA Tyres NSW", matched:691, unmatched:86, total:777}]},
+    {key:"kumho", matched:776, unmatched:0, total:776, locations:[{name:"Kumho", matched:776, unmatched:0, total:776}]},
+    {key:"tyredepot", matched:576, unmatched:150, total:726, locations:[{name:"Tyredepot", matched:574, unmatched:150, total:724}, {name:"Tyredepot Virtual", matched:2, unmatched:0, total:2}]},
+    {key:"townsend", matched:396, unmatched:293, total:689, locations:[{name:"Townsend", matched:396, unmatched:293, total:689}]},
+    {key:"getagrip", matched:194, unmatched:301, total:495, locations:[{name:"GetAGrip", matched:194, unmatched:301, total:495}]},
+    {key:"spmotorcycles", matched:310, unmatched:47, total:357, locations:[{name:"SPMotorcycles", matched:310, unmatched:47, total:357}]},
+    {key:"goodride-wa", matched:219, unmatched:20, total:239, locations:[{name:"Goodride WA", matched:219, unmatched:20, total:239}]},
+    {key:"atlastyres", matched:127, unmatched:104, total:231, locations:[{name:"Atlastyres", matched:127, unmatched:104, total:231}]},
+    {key:"michelin", matched:152, unmatched:0, total:152, locations:[{name:"Michelin VIC", matched:44, unmatched:0, total:44}, {name:"Michelin NSW", matched:37, unmatched:0, total:37}, {name:"Michelin WA", matched:36, unmatched:0, total:36}, {name:"Michelin QLD", matched:35, unmatched:0, total:35}]}
+  ];
+  data.forEach(function (d) { d.rate = d.total ? (d.unmatched / d.total * 100) : 0; });
+
+  var canvas = document.getElementById('chart');
+  var chart;
+  var ddChart;
+  var currentSort = 'total';
+  var filterText = '';
+
+  function computeRows() {
+    var rows = data.filter(function (d) {
+      return d.key.toLowerCase().indexOf(filterText.toLowerCase()) !== -1;
+    });
+    rows = rows.slice().sort(function (a, b) {
+      if (currentSort === 'rate') return b.rate - a.rate;
+      if (currentSort === 'alpha') return a.key.localeCompare(b.key);
+      return b.total - a.total;
+    });
+    return rows;
+  }
+
+  function render() {
+    var rows = computeRows();
+    var barHeight = 24;
+    document.getElementById('chartHeight').style.height = Math.max(rows.length * barHeight + 40, 120) + 'px';
+
+    var labels = rows.map(function (d) { return d.key; });
+    var matched = rows.map(function (d) { return d.matched; });
+    var unmatched = rows.map(function (d) { return d.unmatched; });
+
+    if (chart) chart.destroy();
+    chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Mapped', data: matched, backgroundColor: '#1f7a6c', stack: 's', borderRadius: 1 },
+          { label: 'Not Mapped', data: unmatched, backgroundColor: '#c76a2e', stack: 's', borderRadius: 1 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: '#e2e0d8' },
+            title: { display: true, text: 'Stock rows (qty > 0)', font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 10 } }
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            bodyFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            callbacks: {
+              afterBody: function (items) {
+                var idx = items[0].dataIndex;
+                var d = rows[idx];
+                return ['', 'Total: ' + d.total.toLocaleString() + ' rows', 'Not mapped rate: ' + d.rate.toFixed(1) + '%'];
+              }
+            }
+          }
+        },
+        onClick: function (evt, elements) {
+          if (!elements.length) return;
+          var idx = elements[0].index;
+          showDrilldown(rows[idx]);
+        },
+        onHover: function (evt, elements) {
+          canvas.style.cursor = elements.length ? 'pointer' : 'default';
+        }
+      }
+    });
+  }
+
+  function renderTable() {
+    var rows = computeRows();
+    var body = document.getElementById('tableBody');
+    body.innerHTML = '';
+    rows.forEach(function (d, i) {
+      var tr = document.createElement('tr');
+      tr.className = 'bar-row';
+      tr.style.background = i % 2 === 0 ? '#ffffff' : '#f6f5f1';
+      var boldRate = d.rate > 30 ? 'font-weight:700;' : '';
+      tr.innerHTML =
+        '<td>' + d.key + '</td>' +
+        '<td class="num">' + d.total.toLocaleString() + '</td>' +
+        '<td class="num" style="color:#1f7a6c;">' + d.matched.toLocaleString() + '</td>' +
+        '<td class="num" style="color:#c76a2e;">' + d.unmatched.toLocaleString() + '</td>' +
+        '<td class="num" style="' + boldRate + '">' + d.rate.toFixed(1) + '%</td>';
+      tr.addEventListener('click', function () { showDrilldown(d); });
+      body.appendChild(tr);
+    });
+  }
+
+  function showDrilldown(d) {
+    var locs = (d.locations || []).slice().sort(function (a, b) { return b.total - a.total; });
+    locs.forEach(function (l) { l.rate = l.total ? (l.unmatched / l.total * 100) : 0; });
+
+    document.getElementById('ddTitle').textContent = d.key;
+    document.getElementById('ddSub').textContent = locs.length + (locs.length === 1 ? ' location' : ' locations') +
+      ' — ' + d.total.toLocaleString() + ' rows, ' + d.rate.toFixed(1) + '% not mapped overall';
+
+    var ddCanvas = document.getElementById('ddChart');
+    document.getElementById('ddChartHeight').style.height = Math.max(locs.length * 26 + 40, 100) + 'px';
+
+    var labels = locs.map(function (l) { return l.name; });
+    var matchedArr = locs.map(function (l) { return l.matched; });
+    var unmatchedArr = locs.map(function (l) { return l.unmatched; });
+
+    if (ddChart) ddChart.destroy();
+    ddChart = new Chart(ddCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Mapped', data: matchedArr, backgroundColor: '#1f7a6c', stack: 's', borderRadius: 1 },
+          { label: 'Not Mapped', data: unmatchedArr, backgroundColor: '#c76a2e', stack: 's', borderRadius: 1 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 200 },
+        scales: {
+          x: {
+            stacked: true,
+            grid: { color: '#e2e0d8' },
+            title: { display: true, text: 'Stock rows (qty > 0)', font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 10 } }
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } },
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            bodyFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            callbacks: {
+              afterBody: function (items) {
+                var idx = items[0].dataIndex;
+                var l = locs[idx];
+                return ['', 'Total: ' + l.total.toLocaleString() + ' rows', 'Not mapped rate: ' + l.rate.toFixed(1) + '%'];
+              }
+            }
+          }
+        }
+      }
+    });
+
+    document.getElementById('drilldown').classList.add('active');
+    document.getElementById('drilldown').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  document.getElementById('ddClose').addEventListener('click', function () {
+    document.getElementById('drilldown').classList.remove('active');
+  });
+
+  render();
+  renderTable();
+
+  document.getElementById('search').addEventListener('input', function (e) {
+    filterText = e.target.value;
+    render();
+    renderTable();
+  });
+
+  function setActive(id) {
+    ['sortTotal', 'sortRate', 'sortAlpha'].forEach(function (b) {
+      document.getElementById(b).classList.toggle('active', b === id);
+    });
+  }
+  document.getElementById('sortTotal').addEventListener('click', function () { currentSort = 'total'; setActive('sortTotal'); render(); renderTable(); });
+  document.getElementById('sortRate').addEventListener('click', function () { currentSort = 'rate'; setActive('sortRate'); render(); renderTable(); });
+  document.getElementById('sortAlpha').addEventListener('click', function () { currentSort = 'alpha'; setActive('sortAlpha'); render(); renderTable(); });
+
+  document.getElementById('viewChart').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('viewTable').classList.remove('active');
+    document.getElementById('panelChart').classList.add('active');
+    document.getElementById('panelTable').classList.remove('active');
+  });
+  document.getElementById('viewTable').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('viewChart').classList.remove('active');
+    document.getElementById('panelTable').classList.add('active');
+    document.getElementById('panelChart').classList.remove('active');
+  });
+})();
+</script>
+</body>
+</html>

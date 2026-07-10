@@ -1,0 +1,50 @@
+SLACK / SHORT VERSION
+---------------------
+Hey alepuri — could you add a new dashboard tab to the internal dashboards site
+(dashboards-vuweqgdcca-ts.a.run.app)?
+
+• Tab: "Stock Matching"
+• Section: Marketing (alongside Shipment Accuracy)
+• File: supplier_stock_match_dashboard_inlined.html (attached)
+
+It's a single self-contained HTML file — no build step, no external dependencies
+(Chart.js is inlined), so it should drop straight in. Full details in the attached
+PUBLISH_NOTE.
+
+Also — could you send me the repo URL and add me as a collaborator (my GitHub is
+Metstyroola)? Then I can push future dashboards myself instead of routing through
+you. Thanks!
+
+
+EMAIL / LONGER VERSION
+----------------------
+Subject: Please publish a new "Stock Matching" dashboard (Marketing section)
+
+Hi alepuri,
+
+Could you help me publish a new dashboard to the internal dashboards site
+(https://dashboards-vuweqgdcca-ts.a.run.app/)?
+
+  • Tab name:  Stock Matching
+  • Section:   Marketing (same group as Shipment Accuracy)
+  • Anchor:    #stock-matching (suggested)
+
+I've attached two files:
+  1. supplier_stock_match_dashboard_inlined.html  <- please use this one
+  2. PUBLISH_NOTE_for_alepuri.md                  <- full details
+
+The dashboard is a single self-contained HTML file with no build step and no
+external dependencies — the charting library (Chart.js) is inlined, so there are
+no CSP or CDN changes needed. It should drop straight into wherever the site
+serves dashboards from.
+
+For reference, it reports supplier stock mapping coverage: 31 suppliers,
+101,957 in-stock rows, 88.5% mapped / 11.5% not mapped, with a per-location
+drill-down.
+
+One more thing: could you also send me the repo URL and add me as a collaborator
+(my GitHub username is Metstyroola)? That way I can push future dashboards to the
+right folder myself instead of routing each one through you.
+
+Thanks!
+Emeterio
