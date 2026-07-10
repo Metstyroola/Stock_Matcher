@@ -377,6 +377,46 @@ const STOCK_MAP_NAME_TO_KEY = {
   "Michelin VIC": "michelin", "Michelin NSW": "michelin", "Michelin WA": "michelin", "Michelin QLD": "michelin"
 };
 const STOCK_ALLOWED_NAMES = Object.keys(STOCK_MAP_NAME_TO_KEY);
+const STOCK_KNOWN_KEYS = Array.from(new Set(Object.values(STOCK_MAP_NAME_TO_KEY)));
+
+function sqlQuoteList(strs) {
+  return strs.map(s => "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'").join(',');
+}
+
+// Row-level export (CSV/Excel): one row per stock item, for the selected
+// supplier key(s) + match_status filter. `keys` must already be validated
+// against STOCK_KNOWN_KEYS by the caller (route handler).
+function stockRowsForKeys(keys) {
+  const keySet = new Set(keys);
+  return STOCK_ALLOWED_NAMES.filter(name => keySet.has(STOCK_MAP_NAME_TO_KEY[name]));
+}
+
+function stockMappingRowsSQL(names, status) {
+  let sql = 'SELECT supplier_name, supplier_pid, supplier_description, qty, price, match_status\n' +
+    'FROM `' + PROJECT_ID + '.' + STOCK_STOCK_TABLE + '`\n' +
+    "WHERE qty > 0 AND supplier_pid NOT LIKE r'DELETED\\_%'\n" +
+    '  AND supplier_name IN (' + sqlQuoteList(names) + ')\n';
+  if (status === 'matched' || status === 'unmatched') {
+    sql += "  AND match_status = '" + status + "'\n";
+  }
+  sql += 'ORDER BY supplier_name, supplier_pid';
+  return sql;
+}
+
+async function fetchStockMappingRows(keys, status) {
+  const names = stockRowsForKeys(keys);
+  if (!names.length) return [];
+  const rows = await runBQQuery(stockMappingRowsSQL(names, status));
+  return rows.map(r => ({
+    supplier_key: STOCK_MAP_NAME_TO_KEY[r.supplier_name] || '',
+    supplier_name: r.supplier_name || '',
+    supplier_pid: r.supplier_pid || '',
+    description: r.supplier_description || '',
+    qty: Number(r.qty) || 0,
+    price: (r.price === null || r.price === undefined || r.price === '') ? null : Number(r.price),
+    match_status: r.match_status || ''
+  }));
+}
 
 function stockMappingSQL() {
   const inList = STOCK_ALLOWED_NAMES.map(n => "'" + n.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'").join(',');
@@ -1241,6 +1281,24 @@ const server = http.createServer(async(req,res)=>{
       } catch(e) { /* timestamp is best-effort */ }
       const totals = data.reduce((a,d)=>{ a.matched+=d.matched; a.unmatched+=d.unmatched; a.total+=d.total; return a; }, {matched:0,unmatched:0,total:0});
       sendJSON(res, 200, { ok:true, generated_at:new Date().toISOString(), refreshed_at, suppliers:data.length, totals, data });
+    } catch(e) {
+      const isAuth = /NOT_AUTHENTICATED|UNAUTHENTICATED|invalid_grant|reauth/i.test(e.message||'');
+      sendJSON(res, isAuth?401:500, { ok:false, error:e.message, hint: isAuth ? 'Run Setup_BigQuery_Auth.bat (gcloud auth application-default login), then restart StockMatch.' : undefined });
+    }
+    return;
+  }
+
+  // /api/stock-mapping/rows — row-level export (CSV/Excel) for selected supplier(s) + status
+  if (req.method==='GET' && url.pathname==='/api/stock-mapping/rows') {
+    try {
+      const keysParam = (url.searchParams.get('keys')||'').trim();
+      const statusParam = (url.searchParams.get('status')||'all').trim().toLowerCase();
+      const status = (statusParam==='matched'||statusParam==='unmatched') ? statusParam : 'all';
+      let keys = keysParam ? keysParam.split(',').map(s=>s.trim()).filter(Boolean) : STOCK_KNOWN_KEYS.slice();
+      keys = keys.filter(k => STOCK_KNOWN_KEYS.includes(k));
+      if (!keys.length) { sendJSON(res, 400, {ok:false, error:'No valid supplier keys given. Known keys: '+STOCK_KNOWN_KEYS.join(', ')}); return; }
+      const rows = await fetchStockMappingRows(keys, status);
+      sendJSON(res, 200, { ok:true, generated_at:new Date().toISOString(), filters:{keys, status}, count:rows.length, rows });
     } catch(e) {
       const isAuth = /NOT_AUTHENTICATED|UNAUTHENTICATED|invalid_grant|reauth/i.test(e.message||'');
       sendJSON(res, isAuth?401:500, { ok:false, error:e.message, hint: isAuth ? 'Run Setup_BigQuery_Auth.bat (gcloud auth application-default login), then restart StockMatch.' : undefined });

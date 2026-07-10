@@ -22,6 +22,14 @@ Two things I need from you:
 Also — could you add me as a collaborator on the repo (GitHub: Metstyroola)?
 I'd like to be able to push future dashboards myself.
 
+One more thing: if you ever want to make this dashboard genuinely bq-live, I've
+already got a working reference for the query + serving logic in my own repo —
+github.com/Metstyroola/Stock_Matcher (private; happy to add you as a
+collaborator if useful). It's a Node/Express app, not this platform's
+Python/FastAPI pattern, so it's not something to merge directly — just a
+working proof that the curated-supplier-set query reconciles exactly against
+the original snapshot, in case it saves you time building the real mart/route.
+
 Thanks!
 
 
@@ -76,6 +84,17 @@ want to scope that separately.
 Also — could you add me as a collaborator on the repo (GitHub: Metstyroola)?
 That way I can push future dashboards directly instead of routing PRs through
 you every time.
+
+One more thing on the bq-live question above: I already have a working
+reference implementation of the query + live-serving logic at
+github.com/Metstyroola/Stock_Matcher (private repo — happy to add you as a
+collaborator). It's a standalone Node/Express app (server.js has a
+/api/stock-mapping endpoint querying BigQuery directly), so it's a different
+stack from this platform's Python/FastAPI server and isn't something to merge
+in as-is. But the query logic in there is validated: it reconciles exactly
+against the original hand-curated snapshot for 30 of 31 suppliers (Chapel
+Corner is the one documented exception, per the caveat above). Could save you
+some time if you end up building the real mart + server route for this.
 
 Thanks!
 Emeterio

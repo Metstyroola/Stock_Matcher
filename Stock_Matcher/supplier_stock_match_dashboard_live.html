@@ -238,9 +238,45 @@
   .live-status.err { color: var(--unmatched); }
   .refresh-btn { font-family:'Helvetica Neue',Arial,sans-serif; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; border:1px solid var(--ink); background:var(--panel); color:var(--ink); padding:4px 10px; margin-left:8px; cursor:pointer; border-radius:3px; }
   .refresh-btn:hover { background: var(--ink); color: var(--paper); }
+
+  .export-panel { background: var(--panel); border: 1px solid var(--line); padding: 16px 22px; margin-bottom: 14px; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  .export-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .export-head strong { font-size:13px; text-transform:uppercase; letter-spacing:0.04em; }
+  .export-sub { font-size:11.5px; color:var(--muted); }
+  .export-body { display:flex; gap:28px; flex-wrap:wrap; }
+  .export-col { min-width:220px; }
+  .export-label { font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:6px; }
+  .export-supplier-actions { margin-bottom:6px; }
+  .export-supplier-actions button { font-family:inherit; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; border:1px solid var(--line); background:var(--paper); color:var(--ink); padding:3px 9px; margin-right:6px; cursor:pointer; border-radius:3px; }
+  .export-supplier-actions button:hover { border-color:var(--ink); }
+  .export-supplier-list { max-height:150px; overflow-y:auto; border:1px solid var(--line); padding:8px 10px; background:var(--paper); columns:2; column-gap:14px; }
+  .export-supplier-list label { display:block; font-size:12px; padding:2px 0; white-space:nowrap; break-inside:avoid; }
+  .export-supplier-list input { margin-right:6px; }
+  .export-loading { font-size:11.5px; color:var(--muted); }
+  .export-radio { display:block; font-size:12.5px; padding:3px 0; cursor:pointer; }
+  .export-radio input { margin-right:6px; }
+  .export-buttons { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+  .export-btn { font-family:inherit; font-size:11.5px; text-transform:uppercase; letter-spacing:0.04em; border:1px solid var(--ink); background:var(--ink); color:var(--paper); padding:7px 14px; cursor:pointer; border-radius:3px; }
+  .export-btn:hover { opacity:0.85; }
+  .export-btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .export-status { font-size:11px; color:var(--muted); margin-top:8px; min-height:14px; }
+  .export-status.err { color: var(--unmatched); }
+  .export-status.ok { color: var(--matched); }
+
+  .app-tabs { display:flex; gap:0; border-bottom:3px solid var(--ink); background:var(--paper); font-family:'Helvetica Neue',Arial,sans-serif; }
+  .app-tab { font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em; border:none; background:var(--paper); color:var(--muted); padding:12px 22px; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-3px; }
+  .app-tab.active { color:var(--ink); border-bottom-color:var(--ink); font-weight:700; }
+  .app-tab:hover:not(.active) { color:var(--ink); }
+  #matcherView { display:none; }
+  #matcherFrame { width:100%; height:calc(100vh - 48px); border:none; display:block; }
 </style>
 </head>
 <body>
+<div class="app-tabs">
+  <button id="tabReport" class="app-tab active" type="button">Stock Mapping Report</button>
+  <button id="tabMatcher" class="app-tab" type="button">Stock Matcher Tool</button>
+</div>
+<div id="reportView">
 <div class="wrap">
 
   <div class="masthead">
@@ -320,6 +356,36 @@
     </div>
   </div>
 
+  <div class="export-panel" id="exportPanel">
+    <div class="export-head">
+      <strong>Export data</strong>
+      <span class="export-sub">Individual stock rows (SKU-level), not the summary counts above.</span>
+    </div>
+    <div class="export-body">
+      <div class="export-col">
+        <div class="export-label">Suppliers</div>
+        <div class="export-supplier-actions">
+          <button id="expSelectAll" type="button">All</button>
+          <button id="expSelectNone" type="button">None</button>
+        </div>
+        <div class="export-supplier-list" id="exportSupplierList">
+          <div class="export-loading">Loading supplier list…</div>
+        </div>
+      </div>
+      <div class="export-col">
+        <div class="export-label">Status</div>
+        <label class="export-radio"><input type="radio" name="expStatus" value="all" checked> All rows</label>
+        <label class="export-radio"><input type="radio" name="expStatus" value="matched"> Mapped only</label>
+        <label class="export-radio"><input type="radio" name="expStatus" value="unmatched"> Not mapped only</label>
+        <div class="export-buttons">
+          <button id="expCsvBtn" type="button" class="export-btn">Download CSV</button>
+          <button id="expXlsBtn" type="button" class="export-btn">Download Excel</button>
+        </div>
+        <div class="export-status" id="exportStatus"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="drilldown" id="drilldown">
     <div class="drilldown-head">
       <div>
@@ -341,6 +407,11 @@
     <strong>Live</strong> — queried directly from <code>xx_development.popeye_production_au_public_supplier_stock</code> each time this page loads (click Refresh to re-query). Basis: <code>match_status</code> filtered to <code>qty &gt; 0</code>, <code>supplier_pid NOT LIKE 'DELETED\_%'</code>, restricted to the curated 31-supplier account set (30 low-priority/duplicate accounts excluded). Note: unlike the original static snapshot, the Chapel Corner non-tyre accessory SKUs are <em>not</em> removed here (that was a manual SKU-level exclusion), so Chapel Corner's not-mapped count runs a little higher. The source table is a periodic refresh, not a real-time feed — see the refresh timestamp above.
   </div>
 
+</div>
+</div>
+
+<div id="matcherView">
+  <iframe id="matcherFrame" title="Stock Matcher Tool"></iframe>
 </div>
 
 <script>
@@ -550,6 +621,7 @@
         updateStats();
         render();
         renderTable();
+        populateExportSuppliers();
         var when = res.j.refreshed_at ? new Date(res.j.refreshed_at).toLocaleString() : 'unknown';
         setStatus('Live · source last refreshed ' + when, 'ok');
       })
@@ -559,6 +631,129 @@
   }
   document.getElementById('refreshBtn').addEventListener('click', loadData);
   loadData();
+
+  // ── Export (row-level CSV / Excel) ─────────────────────────────────────
+  function populateExportSuppliers() {
+    var list = document.getElementById('exportSupplierList');
+    if (!data.length) { list.innerHTML = '<div class="export-loading">No suppliers loaded.</div>'; return; }
+    var sorted = data.slice().sort(function (a, b) { return a.key.localeCompare(b.key); });
+    list.innerHTML = sorted.map(function (d) {
+      return '<label><input type="checkbox" class="expSupplierChk" value="' + d.key + '" checked> ' + d.key + '</label>';
+    }).join('');
+  }
+  document.getElementById('expSelectAll').addEventListener('click', function () {
+    document.querySelectorAll('.expSupplierChk').forEach(function (c) { c.checked = true; });
+  });
+  document.getElementById('expSelectNone').addEventListener('click', function () {
+    document.querySelectorAll('.expSupplierChk').forEach(function (c) { c.checked = false; });
+  });
+
+  function selectedExportKeys() {
+    return Array.prototype.slice.call(document.querySelectorAll('.expSupplierChk:checked')).map(function (c) { return c.value; });
+  }
+  function selectedExportStatus() {
+    var el = document.querySelector('input[name="expStatus"]:checked');
+    return el ? el.value : 'all';
+  }
+  function setExportStatus(msg, kind) {
+    var el = document.getElementById('exportStatus');
+    el.textContent = msg;
+    el.className = 'export-status ' + (kind || '');
+  }
+  function csvEscape(v) {
+    var s = (v === null || v === undefined) ? '' : String(v);
+    if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  // Plain CSV carries no per-cell type — Excel auto-detects numeric-looking text
+  // (e.g. a Supplier PID like "000219") and reformats it, dropping leading zeros
+  // or switching to scientific notation. Wrapping as ="value" forces Excel to
+  // keep it as literal text. Internal quotes are escaped first so the value
+  // can't break out of the formula's string literal.
+  function csvForceText(v) {
+    var s = (v === null || v === undefined) ? '' : String(v);
+    return '="' + s.replace(/"/g, '""') + '"';
+  }
+  function xmlEscape(v) {
+    var s = (v === null || v === undefined) ? '' : String(v);
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  }
+  function downloadBlob(content, mime, filename) {
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  var EXPORT_COLS = ['supplier_key', 'supplier_name', 'supplier_pid', 'description', 'qty', 'price', 'match_status'];
+  var EXPORT_HEADERS = ['Supplier Key', 'Location', 'Supplier PID', 'Description', 'Qty', 'Price', 'Match Status'];
+  var EXPORT_NUMERIC = { qty: true, price: true };
+
+  function fetchExportRows() {
+    var keys = selectedExportKeys();
+    var status = selectedExportStatus();
+    if (!keys.length) { setExportStatus('Select at least one supplier.', 'err'); return Promise.reject(new Error('no suppliers selected')); }
+    setExportStatus('Querying BigQuery…', '');
+    var url = '/api/stock-mapping/rows?keys=' + encodeURIComponent(keys.join(',')) + '&status=' + encodeURIComponent(status);
+    return fetch(url, { cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j || res.j.ok === false) throw new Error((res.j && res.j.error) || ('HTTP ' + res.status));
+        return { rows: res.j.rows || [], status: status, keys: keys };
+      });
+  }
+  function stamp() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+  function exportFilename(ext, status, keys) {
+    var scope = keys.length === 1 ? keys[0] : (keys.length + 'suppliers');
+    return 'stock-mapping_' + scope + '_' + status + '_' + stamp() + '.' + ext;
+  }
+
+  document.getElementById('expCsvBtn').addEventListener('click', function () {
+    fetchExportRows().then(function (res) {
+      if (!res.rows.length) { setExportStatus('No rows match that selection.', 'err'); return; }
+      var lines = [EXPORT_HEADERS.map(csvEscape).join(',')];
+      res.rows.forEach(function (r) {
+        lines.push(EXPORT_COLS.map(function (c) {
+          return EXPORT_NUMERIC[c] ? csvEscape(r[c]) : csvEscape(csvForceText(r[c]));
+        }).join(','));
+      });
+      downloadBlob(String.fromCharCode(0xFEFF) + lines.join('\r\n'), 'text/csv;charset=utf-8', exportFilename('csv', res.status, res.keys));
+      setExportStatus(res.rows.length.toLocaleString() + ' rows exported.', 'ok');
+    }).catch(function (err) { setExportStatus('Export failed: ' + err.message, 'err'); });
+  });
+
+  document.getElementById('expXlsBtn').addEventListener('click', function () {
+    fetchExportRows().then(function (res) {
+      if (!res.rows.length) { setExportStatus('No rows match that selection.', 'err'); return; }
+      var headerRow = '<Row>' + EXPORT_HEADERS.map(function (h) {
+        return '<Cell><Data ss:Type="String">' + xmlEscape(h) + '</Data></Cell>';
+      }).join('') + '</Row>';
+      var dataRows = res.rows.map(function (r) {
+        return '<Row>' + EXPORT_COLS.map(function (c) {
+          var v = r[c];
+          if (EXPORT_NUMERIC[c] && v !== null && v !== undefined && v !== '') {
+            return '<Cell><Data ss:Type="Number">' + xmlEscape(v) + '</Data></Cell>';
+          }
+          return '<Cell><Data ss:Type="String">' + xmlEscape(v) + '</Data></Cell>';
+        }).join('') + '</Row>';
+      }).join('');
+      var xml = '<?xml version="1.0"?>\n' +
+        '<?mso-application progid="Excel.Sheet"?>\n' +
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+        'xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+        'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+        'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n' +
+        '<Worksheet ss:Name="Stock Mapping"><Table>' + headerRow + dataRows + '</Table></Worksheet>\n' +
+        '</Workbook>';
+      downloadBlob(xml, 'application/vnd.ms-excel', exportFilename('xls', res.status, res.keys));
+      setExportStatus(res.rows.length.toLocaleString() + ' rows exported.', 'ok');
+    }).catch(function (err) { setExportStatus('Export failed: ' + err.message, 'err'); });
+  });
 
   document.getElementById('search').addEventListener('input', function (e) {
     filterText = e.target.value;
@@ -586,6 +781,25 @@
     document.getElementById('viewChart').classList.remove('active');
     document.getElementById('panelTable').classList.add('active');
     document.getElementById('panelChart').classList.remove('active');
+  });
+
+  // ── App tabs: Stock Mapping Report <-> Stock Matcher Tool (iframe, lazy-loaded) ──
+  var matcherLoaded = false;
+  document.getElementById('tabReport').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('tabMatcher').classList.remove('active');
+    document.getElementById('reportView').style.display = '';
+    document.getElementById('matcherView').style.display = 'none';
+  });
+  document.getElementById('tabMatcher').addEventListener('click', function () {
+    this.classList.add('active');
+    document.getElementById('tabReport').classList.remove('active');
+    document.getElementById('reportView').style.display = 'none';
+    document.getElementById('matcherView').style.display = 'block';
+    if (!matcherLoaded) {
+      document.getElementById('matcherFrame').src = '/stock_matcher_app.html';
+      matcherLoaded = true;
+    }
   });
 })();
 </script>
