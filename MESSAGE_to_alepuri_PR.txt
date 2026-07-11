@@ -3,17 +3,19 @@ SLACK / SHORT VERSION
 Hey alepuri — I opened a PR adding a "Stock Matching" dashboard under Marketing
 in betty-boop:
 
-  https://github.com/alepuri/betty-boop/pull/new/claude/emets-stock-matching-marketing
+  https://github.com/alepuri/betty-boop/pull/200
   (branch: claude/emets-stock-matching-marketing)
 
 It's a frozen-snapshot dashboard (supplier stock-mapping coverage — mapped vs
 not-mapped in-stock rows by supplier, with a location drill-down), added
 entirely under the analyst-writable web/dashboards/ path — no server/ or
-registry changes needed.
+registry changes needed. dashboards-preview-evidence and dashboards-path-guard
+are both green — it's ready for review whenever you have time.
 
 Two things I need from you:
 1. Review + merge the PR (preview evidence + validation notes are in the
-   description).
+   description — includes a real CSS bug I found and fixed during the
+   fixture-preview review, see the "BUG FOUND + FIXED" note).
 2. Stage the real snapshot data to GCS so it shows real numbers instead of the
    "missing" banner — two small files, exact command in
    stock-matching-gcs-staging/README.txt (attached). Needs bucket write access
@@ -42,25 +44,33 @@ Hi alepuri,
 I've opened a PR against betty-boop adding a new "Stock Matching" dashboard
 under the Marketing category:
 
-  PR branch: claude/emets-stock-matching-marketing
-  Open here: https://github.com/alepuri/betty-boop/pull/new/claude/emets-stock-matching-marketing
-  Commit: 4669e11a369edb73811de7b657d7da574a96c48c
+  PR: https://github.com/alepuri/betty-boop/pull/200
+  Branch: claude/emets-stock-matching-marketing
+  Latest commit: 19645d8 (a CSS fix, see below)
 
 What it is: supplier stock-mapping coverage — mapped vs not-mapped in-stock
 rows by supplier, with a per-location drill-down. Point-in-time snapshot
 (frozen 2026-07-01), matching the pattern used by ai-readiness / rtb-ab.
 
 Everything in the PR sits under the analyst-writable web/dashboards/ path —
-I didn't touch server/, the registry, or any build config. I ran both
-validators locally before pushing:
+I didn't touch server/, the registry, or any build config. Both required
+checks are green (dashboards-preview-evidence, dashboards-path-guard), and I
+ran both validators locally before pushing:
   - python -m server.registry --validate  -> OK
   - python scripts/verify_manifest.py     -> stock-matching data/ matches MANIFEST
 
 Two things I need from you:
 
 1. Review + merge. The PR description includes the required preview-evidence
-   section (rendered locally, screenshot verified, KPIs/table/chart all
-   checked against the source query).
+   section — I actually stood up the platform locally (uvicorn + the fixture
+   registry, DASHBOARDS_DEV=1 DASHBOARDS_FIXTURE=1) and reviewed the rendered
+   dashboard end-to-end rather than just eyeballing the source. That review
+   caught a real bug: .kpi .label only set color, not background, so the
+   shared popeye-theme.css's bare .label badge class (white text on a grey
+   pill) leaked its background through, making every KPI tile label almost
+   invisible (grey-on-grey) — would have shipped to production. Fixed by
+   renaming to .kpi-label; that fix is in commit 19645d8, already on this
+   branch. Full details in the PR's "BUG FOUND + FIXED" note.
 
 2. Stage the real data to GCS. The dashboard's data/ files are gitignored per
    the platform's data rules, so the real snapshot isn't in the PR — it needs

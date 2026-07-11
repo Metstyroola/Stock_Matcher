@@ -405,6 +405,8 @@
 
   <div class="footnote">
     <strong>Live</strong> — queried directly from <code>xx_development.popeye_production_au_public_supplier_stock</code> each time this page loads (click Refresh to re-query). Basis: <code>match_status</code> filtered to <code>qty &gt; 0</code>, <code>supplier_pid NOT LIKE 'DELETED\_%'</code>, restricted to the curated 31-supplier account set (30 low-priority/duplicate accounts excluded). Note: unlike the original static snapshot, the Chapel Corner non-tyre accessory SKUs are <em>not</em> removed here (that was a manual SKU-level exclusion), so Chapel Corner's not-mapped count runs a little higher. The source table is a periodic refresh, not a real-time feed — see the refresh timestamp above.
+    <br><br>
+    <strong>Known drift from the shared dashboard (as of 2026-07-11):</strong> the "Stock Matching" tab on the internal dashboards site (Merch category) was migrated off this same <code>xx_development</code> table onto a canonical source — <code>Sales_Dashboard_Views.supplier_stock_updated</code> joined to <code>product_map_updated</code> and <code>supplier_updatedv3</code> — because <code>xx_development</code> is documented as "do not query in production." That canonical source requires cross-project BigQuery access (<code>tyroola.com.au:api-project-290933994367</code>) that this account does not currently have, so this local tool intentionally stays on <code>xx_development</code> for now. Expect small differences from the shared dashboard: it currently shows 29 supplier groups / ~86.3% mapped vs. this tool's 31 / ~87-88%.
   </div>
 
 </div>
