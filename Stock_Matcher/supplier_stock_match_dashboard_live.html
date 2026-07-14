@@ -386,6 +386,23 @@
     </div>
   </div>
 
+  <div class="chart-panel" id="productTypePanel" style="margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+      <div>
+        <strong style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Tempetyres — Tyres vs Wheels</strong>
+        <div style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Wheels are identified by rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"), not tyre sizing — a distinct product line mixed into Tempetyres' feed.</div>
+      </div>
+      <div id="productTypeStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
+    </div>
+    <div id="ptChartHeight" style="position:relative; height:110px;">
+      <canvas id="ptChart"></canvas>
+    </div>
+    <div class="legend-row">
+      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+    </div>
+  </div>
+
   <div class="drilldown" id="drilldown">
     <div class="drilldown-head">
       <div>
@@ -624,6 +641,7 @@
         render();
         renderTable();
         populateExportSuppliers();
+        loadProductTypeBreakdown();
         var when = res.j.refreshed_at ? new Date(res.j.refreshed_at).toLocaleString() : 'unknown';
         setStatus('Live · source last refreshed ' + when, 'ok');
       })
@@ -784,6 +802,68 @@
     document.getElementById('panelTable').classList.add('active');
     document.getElementById('panelChart').classList.remove('active');
   });
+
+  // ── Tempetyres: tyres vs wheels breakdown (not-mapped distinction) ──
+  var ptChart;
+  function loadProductTypeBreakdown() {
+    var statusEl = document.getElementById('productTypeStatus');
+    statusEl.textContent = 'Loading…';
+    fetch('/api/stock-mapping/product-types?keys=tempetyres', { cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j || res.j.ok === false) throw new Error((res.j && res.j.error) || ('HTTP ' + res.status));
+        renderProductTypeChart(res.j.breakdown);
+        var b = res.j.breakdown;
+        var wheelRate = b.wheel.total ? (b.wheel.unmatched / b.wheel.total * 100) : 0;
+        var otherRate = b.tyre_or_other.total ? (b.tyre_or_other.unmatched / b.tyre_or_other.total * 100) : 0;
+        statusEl.textContent = 'Wheels: ' + b.wheel.total.toLocaleString() + ' rows, ' + wheelRate.toFixed(1) +
+          '% not mapped  ·  Tyres/Other: ' + b.tyre_or_other.total.toLocaleString() + ' rows, ' + otherRate.toFixed(1) + '% not mapped';
+      })
+      .catch(function (err) {
+        statusEl.textContent = 'Could not load: ' + err.message;
+      });
+  }
+  function renderProductTypeChart(b) {
+    var ctx = document.getElementById('ptChart').getContext('2d');
+    var labels = ['Wheels', 'Tyres / Other'];
+    var matched = [b.wheel.matched, b.tyre_or_other.matched];
+    var unmatched = [b.wheel.unmatched, b.tyre_or_other.unmatched];
+    if (ptChart) ptChart.destroy();
+    ptChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Mapped', data: matched, backgroundColor: '#1f7a6c', stack: 's', borderRadius: 1 },
+          { label: 'Not Mapped', data: unmatched, backgroundColor: '#c76a2e', stack: 's', borderRadius: 1 }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        scales: {
+          x: { stacked: true, grid: { color: '#e2e0d8' }, ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 10 } } },
+          y: { stacked: true, ticks: { font: { family: 'Helvetica Neue, Arial, sans-serif', size: 11 } }, grid: { display: false } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            bodyFont: { family: 'Helvetica Neue, Arial, sans-serif' },
+            callbacks: {
+              afterBody: function (items) {
+                var idx = items[0].dataIndex;
+                var d = idx === 0 ? b.wheel : b.tyre_or_other;
+                return ['', 'Total: ' + d.total.toLocaleString() + ' rows', 'Not mapped rate: ' + (d.total ? (d.unmatched / d.total * 100) : 0).toFixed(1) + '%'];
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 
   // ── App tabs: Stock Mapping Report <-> Stock Matcher Tool (iframe, lazy-loaded) ──
   var matcherLoaded = false;

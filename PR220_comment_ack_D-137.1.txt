@@ -1,0 +1,3 @@
+Thanks for looking into this — makes total sense. Didn't realize every existing raw-Popeye grant was scoped to a service account rather than an individual; agreed that granting me personal IAM here would've been the wrong precedent to set.
+
+The `stock_matching_unmapped_supplier_stock` transform (HO-137) is a better fix anyway — happy to wait for FU-137.1 to land (deploy + the `dashboards_marts` read grant) rather than push ahead with the original ask. I'll leave this PR open until then per FU-137.1's step 4, and I'm around whenever you want to verify the deployed numbers against the HO-117 snapshot headline (29 groups / ~86% mapped) as a sanity check.

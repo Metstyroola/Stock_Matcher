@@ -1,0 +1,65 @@
+SLACK / SHORT VERSION
+---------------------
+Hey [alessio / alepuri] — could I get read access to the raw popeye project?
+
+  Project: api-project-290933994367 (org: tyroola.com.au)
+  Dataset: popeye_production
+  Role needed: BigQuery Data Viewer (roles/bigquery.dataViewer) on that dataset
+  — or narrower, just these tables if you'd rather scope it tight:
+    - popeye_production_au_public_supplier_stock
+    - popeye_production_au_public_product_map
+    - popeye_production_au_public_supplier_address (and/or whatever supplier_updatedv3
+      chains through — happy to confirm the exact table if needed)
+
+Why: the canonical Sales_Dashboard_Views views (supplier_stock_updated,
+product_map_updated, supplier_updatedv3) that the "Stock Matching" dashboard now
+uses in production all chain through raw tables in this project. My account
+(emeterio@tyroola.com) can query the Sales_Dashboard_Views views themselves fine,
+but hits Access Denied the moment a query actually needs to read through to the
+underlying popeye tables. Right now I can't even read this project's IAM policy,
+so I don't know who else besides you already has this — figured you're the
+right person to ask.
+
+This would let my local Stock_Matcher tool match the exact same canonical query
+the shared "Stock Matching" dashboard now uses (HO-117), instead of staying on
+the deprecated xx_development sandbox table.
+
+Thanks!
+
+
+EMAIL / LONGER VERSION
+----------------------
+Subject: Access request — read on api-project-290933994367 (popeye_production)
+
+Hi [alessio / alepuri],
+
+I'd like to request BigQuery read access for my account (emeterio@tyroola.com)
+to the raw popeye project:
+
+  Project:  api-project-290933994367  (org: tyroola.com.au)
+  Dataset:  popeye_production
+  Role:     roles/bigquery.dataViewer on the dataset (or, if you'd rather keep
+            the grant narrow, dataViewer on just these tables):
+              - popeye_production_au_public_supplier_stock
+              - popeye_production_au_public_product_map
+              - popeye_production_au_public_supplier_address
+
+Context: the canonical supplier-stock query the "Stock Matching" dashboard now
+uses in production (per HO-117) reads from Sales_Dashboard_Views.supplier_stock_
+updated LEFT JOIN product_map_updated, joined to supplier_updatedv3. I can query
+those Sales_Dashboard_Views views directly, but each one is itself a view that
+chains through to the raw tables above in api-project-290933994367 — and my
+account gets Access Denied at that point. I also can't read this project's IAM
+policy at all, so I have no visibility into who currently holds what there.
+
+With this access, my local Stock_Matcher tool (the live BigQuery-backed version
+of the Stock Matching dashboard) could run the exact same canonical query as
+production, instead of staying on the xx_development sandbox table (which is
+documented as "do not query in production" and is why the shared dashboard
+itself was migrated off it in HO-117).
+
+Let me know if this needs to route through someone else, or if a narrower grant
+would be preferred.
+
+Thanks!
+Emeterio

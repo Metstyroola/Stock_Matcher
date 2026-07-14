@@ -418,6 +418,40 @@ async function fetchStockMappingRows(keys, status) {
   }));
 }
 
+// Wheel-vs-tyre classification for a supplier's stock descriptions. Validated
+// 2026-07-15 against Tempetyres: the CB (center bore) + ET (offset) dimension
+// notation catches genuine aftermarket alloy wheel listings that don't even
+// contain the word "wheel" (e.g. "20x10.0 5x120 ET48 CB73.1 Satin Black").
+const WHEEL_PATTERN_SQL =
+  "REGEXP_CONTAINS(UPPER(supplier_description), r'\\bWHEEL[S]?\\b|\\bRIM[S]?\\b|\\bALLOY\\b|\\bWHL\\b|\\bHUB\\b|\\bSPOKE[S]?\\b|\\bSTEELIE[S]?\\b|\\bMAG\\b')\n" +
+  "    OR REGEXP_CONTAINS(supplier_description, r'\\d{2}X\\d+(\\.\\d+)?\\s+\\d+X\\d+(\\.\\d+)?\\s+ET-?\\d+')\n" +
+  "    OR REGEXP_CONTAINS(UPPER(supplier_description), r'\\bCB\\d+(\\.\\d+)?\\b')";
+
+function stockProductTypesSQL(names) {
+  return 'SELECT\n' +
+    '  CASE WHEN ' + WHEEL_PATTERN_SQL + ' THEN \'wheel\' ELSE \'tyre_or_other\' END AS product_type,\n' +
+    '  match_status,\n' +
+    '  COUNT(*) AS n\n' +
+    'FROM `' + PROJECT_ID + '.' + STOCK_STOCK_TABLE + '`\n' +
+    "WHERE qty > 0 AND supplier_pid NOT LIKE r'DELETED\\_%'\n" +
+    '  AND supplier_name IN (' + sqlQuoteList(names) + ')\n' +
+    'GROUP BY product_type, match_status';
+}
+
+async function fetchProductTypeBreakdown(keys) {
+  const names = stockRowsForKeys(keys);
+  if (!names.length) return { wheel: { matched: 0, unmatched: 0, total: 0 }, tyre_or_other: { matched: 0, unmatched: 0, total: 0 } };
+  const rows = await runBQQuery(stockProductTypesSQL(names));
+  const out = { wheel: { matched: 0, unmatched: 0, total: 0 }, tyre_or_other: { matched: 0, unmatched: 0, total: 0 } };
+  for (const r of rows) {
+    const type = r.product_type === 'wheel' ? 'wheel' : 'tyre_or_other';
+    const n = Number(r.n) || 0;
+    if (r.match_status === 'matched') out[type].matched += n; else out[type].unmatched += n;
+    out[type].total += n;
+  }
+  return out;
+}
+
 function stockMappingSQL() {
   const inList = STOCK_ALLOWED_NAMES.map(n => "'" + n.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'").join(',');
   return 'SELECT supplier_name, match_status, COUNT(*) AS n\n' +
@@ -1299,6 +1333,22 @@ const server = http.createServer(async(req,res)=>{
       if (!keys.length) { sendJSON(res, 400, {ok:false, error:'No valid supplier keys given. Known keys: '+STOCK_KNOWN_KEYS.join(', ')}); return; }
       const rows = await fetchStockMappingRows(keys, status);
       sendJSON(res, 200, { ok:true, generated_at:new Date().toISOString(), filters:{keys, status}, count:rows.length, rows });
+    } catch(e) {
+      const isAuth = /NOT_AUTHENTICATED|UNAUTHENTICATED|invalid_grant|reauth/i.test(e.message||'');
+      sendJSON(res, isAuth?401:500, { ok:false, error:e.message, hint: isAuth ? 'Run Setup_BigQuery_Auth.bat (gcloud auth application-default login), then restart StockMatch.' : undefined });
+    }
+    return;
+  }
+
+  // /api/stock-mapping/product-types — wheel-vs-tyre breakdown for selected supplier(s)
+  if (req.method==='GET' && url.pathname==='/api/stock-mapping/product-types') {
+    try {
+      const keysParam = (url.searchParams.get('keys')||'').trim();
+      let keys = keysParam ? keysParam.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      keys = keys.filter(k => STOCK_KNOWN_KEYS.includes(k));
+      if (!keys.length) { sendJSON(res, 400, {ok:false, error:'No valid supplier keys given. Known keys: '+STOCK_KNOWN_KEYS.join(', ')}); return; }
+      const breakdown = await fetchProductTypeBreakdown(keys);
+      sendJSON(res, 200, { ok:true, generated_at:new Date().toISOString(), filters:{keys}, breakdown });
     } catch(e) {
       const isAuth = /NOT_AUTHENTICATED|UNAUTHENTICATED|invalid_grant|reauth/i.test(e.message||'');
       sendJSON(res, isAuth?401:500, { ok:false, error:e.message, hint: isAuth ? 'Run Setup_BigQuery_Auth.bat (gcloud auth application-default login), then restart StockMatch.' : undefined });
