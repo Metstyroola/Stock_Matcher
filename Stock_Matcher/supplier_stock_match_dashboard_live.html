@@ -356,27 +356,6 @@
     </div>
   </div>
 
-  <div class="chart-panel" id="productTypePanel" style="margin-bottom:14px;">
-    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
-      <div>
-        <strong id="ptTitle" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Tempetyres — wheels vs tyres vs other</strong>
-        <div id="ptDescription" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.</div>
-      </div>
-      <div id="productTypeStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
-    </div>
-    <div class="toggle-group" style="margin-bottom:10px;">
-      <button id="ptSupTempetyres" class="active" type="button" data-key="tempetyres">Tempetyres</button>
-      <button id="ptSupChapelcorner" type="button" data-key="chapelcorner">Chapel Corner</button>
-    </div>
-    <div id="ptChartHeight" style="position:relative; height:130px;">
-      <canvas id="ptChart"></canvas>
-    </div>
-    <div class="legend-row">
-      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
-      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
-    </div>
-  </div>
-
   <div class="export-panel" id="exportPanel">
     <div class="export-head">
       <strong>Export data</strong>
@@ -421,6 +400,23 @@
     <div class="legend-row">
       <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
       <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+    </div>
+
+    <div id="ddProductTypeSection" style="display:none; margin-top:18px; padding-top:14px; border-top:1px solid var(--line);">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
+        <div>
+          <strong id="ddPtTitle" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;"></strong>
+          <div id="ddPtDescription" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);"></div>
+        </div>
+        <div id="ddPtStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
+      </div>
+      <div id="ddPtChartHeight" style="position:relative; height:130px;">
+        <canvas id="ddPtChart"></canvas>
+      </div>
+      <div class="legend-row">
+        <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+        <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+      </div>
     </div>
   </div>
 
@@ -604,10 +600,13 @@
 
     document.getElementById('drilldown').classList.add('active');
     document.getElementById('drilldown').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    updateDdProductType(d.key);
   }
 
   document.getElementById('ddClose').addEventListener('click', function () {
     document.getElementById('drilldown').classList.remove('active');
+    ddPtRequestSeq++; // invalidate any in-flight product-type fetch so it can't render after close
   });
 
   function computeRate() {
@@ -645,7 +644,6 @@
         render();
         renderTable();
         populateExportSuppliers();
-        loadProductTypeBreakdown();
         var when = res.j.refreshed_at ? new Date(res.j.refreshed_at).toLocaleString() : 'unknown';
         setStatus('Live · source last refreshed ' + when, 'ok');
       })
@@ -807,21 +805,41 @@
     document.getElementById('panelChart').classList.remove('active');
   });
 
-  // ── Product-type breakdown: wheels vs tyres vs other (verified for Tempetyres + Chapel Corner only) ──
-  var ptChart;
-  var ptCurrentKey = 'tempetyres';
-  var ptRequestSeq = 0;
-  function loadProductTypeBreakdown() {
-    var statusEl = document.getElementById('productTypeStatus');
+  // ── Product-type breakdown: wheels vs tyres vs other — folded into each supplier's own
+  // drilldown (shown only for suppliers with a defined classifier; verified for Tempetyres +
+  // Chapel Corner only). No standalone panel, no cross-supplier toggle.
+  var ddPtChart;
+  var ddPtRequestSeq = 0;
+  var PRODUCT_TYPE_SUPPLIERS = {
+    tempetyres: {
+      title: 'Wheels vs Tyres vs Other',
+      description: 'Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.'
+    },
+    chapelcorner: {
+      title: 'Other vs Tyre',
+      description: 'Exact match against a human-curated exclusion list (1,766 items — valves, wheel weights, sockets, tools, niche tyres), the same list behind the original snapshot\'s numbers. No separate wheel bucket for this supplier.'
+    }
+  };
+  function updateDdProductType(key) {
+    var section = document.getElementById('ddProductTypeSection');
+    var info = PRODUCT_TYPE_SUPPLIERS[key];
+    if (!info) {
+      section.style.display = 'none';
+      ddPtRequestSeq++; // invalidate any in-flight fetch from a previously-opened supplier
+      return;
+    }
+    section.style.display = 'block';
+    document.getElementById('ddPtTitle').textContent = info.title;
+    document.getElementById('ddPtDescription').textContent = info.description;
+    var statusEl = document.getElementById('ddPtStatus');
     statusEl.textContent = 'Loading…';
-    var seq = ++ptRequestSeq;
-    var requestedKey = ptCurrentKey;
-    fetch('/api/stock-mapping/product-types?keys=' + encodeURIComponent(requestedKey), { cache: 'no-store' })
+    var seq = ++ddPtRequestSeq;
+    fetch('/api/stock-mapping/product-types?keys=' + encodeURIComponent(key), { cache: 'no-store' })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function (res) {
-        if (seq !== ptRequestSeq) return; // superseded by a newer click — never let a stale response overwrite it
+        if (seq !== ddPtRequestSeq) return; // superseded by a newer drilldown — never let a stale response render
         if (!res.ok || !res.j || res.j.ok === false) throw new Error((res.j && res.j.error) || ('HTTP ' + res.status));
-        renderProductTypeChart(res.j.breakdown);
+        renderDdProductTypeChart(res.j.breakdown);
         var b = res.j.breakdown;
         var wheelRate = b.wheel.total ? (b.wheel.unmatched / b.wheel.total * 100) : 0;
         var tyreRate = b.tyre.total ? (b.tyre.unmatched / b.tyre.total * 100) : 0;
@@ -831,18 +849,18 @@
           'Other: ' + b.other.total.toLocaleString() + ' (' + otherRate.toFixed(1) + '% not mapped)';
       })
       .catch(function (err) {
-        if (seq !== ptRequestSeq) return;
+        if (seq !== ddPtRequestSeq) return;
         statusEl.textContent = 'Could not load: ' + err.message;
       });
   }
-  function renderProductTypeChart(b) {
-    var ctx = document.getElementById('ptChart').getContext('2d');
+  function renderDdProductTypeChart(b) {
+    var ctx = document.getElementById('ddPtChart').getContext('2d');
     var labels = ['Wheels', 'Tyres', 'Other'];
     var order = ['wheel', 'tyre', 'other'];
     var matched = order.map(function (k) { return b[k].matched; });
     var unmatched = order.map(function (k) { return b[k].unmatched; });
-    if (ptChart) ptChart.destroy();
-    ptChart = new Chart(ctx, {
+    if (ddPtChart) ddPtChart.destroy();
+    ddPtChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
@@ -877,37 +895,6 @@
       }
     });
   }
-  var PT_SUPPLIER_INFO = {
-    tempetyres: {
-      title: 'Tempetyres — wheels vs tyres vs other',
-      description: 'Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.'
-    },
-    chapelcorner: {
-      title: 'Chapel Corner — other vs tyre',
-      description: 'Exact match against a human-curated exclusion list (1,766 items — valves, wheel weights, sockets, tools, niche tyres), the same list behind the original snapshot\'s numbers. No separate wheel bucket for this supplier.'
-    }
-  };
-  function updatePtHeader() {
-    var info = PT_SUPPLIER_INFO[ptCurrentKey];
-    document.getElementById('ptTitle').textContent = info.title;
-    document.getElementById('ptDescription').textContent = info.description;
-  }
-  document.getElementById('ptSupTempetyres').addEventListener('click', function () {
-    if (ptCurrentKey === 'tempetyres') return;
-    this.classList.add('active');
-    document.getElementById('ptSupChapelcorner').classList.remove('active');
-    ptCurrentKey = 'tempetyres';
-    updatePtHeader();
-    loadProductTypeBreakdown();
-  });
-  document.getElementById('ptSupChapelcorner').addEventListener('click', function () {
-    if (ptCurrentKey === 'chapelcorner') return;
-    this.classList.add('active');
-    document.getElementById('ptSupTempetyres').classList.remove('active');
-    ptCurrentKey = 'chapelcorner';
-    updatePtHeader();
-    loadProductTypeBreakdown();
-  });
 
   // ── App tabs: Stock Mapping Report <-> Stock Matcher Tool (iframe, lazy-loaded) ──
   var matcherLoaded = false;
