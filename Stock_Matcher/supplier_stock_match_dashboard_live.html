@@ -356,6 +356,27 @@
     </div>
   </div>
 
+  <div class="chart-panel" id="productTypePanel" style="margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
+      <div>
+        <strong id="ptTitle" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Tempetyres — wheels vs tyres vs other</strong>
+        <div id="ptDescription" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.</div>
+      </div>
+      <div id="productTypeStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
+    </div>
+    <div class="toggle-group" style="margin-bottom:10px;">
+      <button id="ptSupTempetyres" class="active" type="button" data-key="tempetyres">Tempetyres</button>
+      <button id="ptSupChapelcorner" type="button" data-key="chapelcorner">Chapel Corner</button>
+    </div>
+    <div id="ptChartHeight" style="position:relative; height:130px;">
+      <canvas id="ptChart"></canvas>
+    </div>
+    <div class="legend-row">
+      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
+      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
+    </div>
+  </div>
+
   <div class="export-panel" id="exportPanel">
     <div class="export-head">
       <strong>Export data</strong>
@@ -383,27 +404,6 @@
         </div>
         <div class="export-status" id="exportStatus"></div>
       </div>
-    </div>
-  </div>
-
-  <div class="chart-panel" id="productTypePanel" style="margin-bottom:14px;">
-    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
-      <div>
-        <strong id="ptTitle" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Tempetyres — wheels vs tyres vs other</strong>
-        <div id="ptDescription" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.</div>
-      </div>
-      <div id="productTypeStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
-    </div>
-    <div class="toggle-group" style="margin-bottom:10px;">
-      <button id="ptSupTempetyres" class="active" type="button" data-key="tempetyres">Tempetyres</button>
-      <button id="ptSupChapelcorner" type="button" data-key="chapelcorner">Chapel Corner</button>
-    </div>
-    <div id="ptChartHeight" style="position:relative; height:130px;">
-      <canvas id="ptChart"></canvas>
-    </div>
-    <div class="legend-row">
-      <div><span class="dot" style="background:#1f7a6c;"></span>Mapped</div>
-      <div><span class="dot" style="background:#c76a2e;"></span>Not Mapped</div>
     </div>
   </div>
 
