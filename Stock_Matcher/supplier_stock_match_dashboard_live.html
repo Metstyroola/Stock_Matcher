@@ -810,12 +810,16 @@
   // ── Product-type breakdown: wheels vs tyres vs other (verified for Tempetyres + Chapel Corner only) ──
   var ptChart;
   var ptCurrentKey = 'tempetyres';
+  var ptRequestSeq = 0;
   function loadProductTypeBreakdown() {
     var statusEl = document.getElementById('productTypeStatus');
     statusEl.textContent = 'Loading…';
-    fetch('/api/stock-mapping/product-types?keys=' + encodeURIComponent(ptCurrentKey), { cache: 'no-store' })
+    var seq = ++ptRequestSeq;
+    var requestedKey = ptCurrentKey;
+    fetch('/api/stock-mapping/product-types?keys=' + encodeURIComponent(requestedKey), { cache: 'no-store' })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function (res) {
+        if (seq !== ptRequestSeq) return; // superseded by a newer click — never let a stale response overwrite it
         if (!res.ok || !res.j || res.j.ok === false) throw new Error((res.j && res.j.error) || ('HTTP ' + res.status));
         renderProductTypeChart(res.j.breakdown);
         var b = res.j.breakdown;
@@ -827,6 +831,7 @@
           'Other: ' + b.other.total.toLocaleString() + ' (' + otherRate.toFixed(1) + '% not mapped)';
       })
       .catch(function (err) {
+        if (seq !== ptRequestSeq) return;
         statusEl.textContent = 'Could not load: ' + err.message;
       });
   }
@@ -888,6 +893,7 @@
     document.getElementById('ptDescription').textContent = info.description;
   }
   document.getElementById('ptSupTempetyres').addEventListener('click', function () {
+    if (ptCurrentKey === 'tempetyres') return;
     this.classList.add('active');
     document.getElementById('ptSupChapelcorner').classList.remove('active');
     ptCurrentKey = 'tempetyres';
@@ -895,6 +901,7 @@
     loadProductTypeBreakdown();
   });
   document.getElementById('ptSupChapelcorner').addEventListener('click', function () {
+    if (ptCurrentKey === 'chapelcorner') return;
     this.classList.add('active');
     document.getElementById('ptSupTempetyres').classList.remove('active');
     ptCurrentKey = 'chapelcorner';
