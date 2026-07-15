@@ -389,8 +389,8 @@
   <div class="chart-panel" id="productTypePanel" style="margin-bottom:14px;">
     <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
       <div>
-        <strong style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Product type breakdown — wheels vs tyres vs other</strong>
-        <div style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Tempetyres: text-pattern classifier (rim/offset/center-bore notation, e.g. "20x10.0 5x120 ET48 CB73.1"). Chapel Corner: exact match against a human-curated exclusion list (1,766 items — valves, wheel weights, sockets, tools, niche tyres), the same list behind the original snapshot's numbers. Not yet checked across the rest of the catalog.</div>
+        <strong id="ptTitle" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:13px; text-transform:uppercase; letter-spacing:0.04em;">Tempetyres — wheels vs tyres vs other</strong>
+        <div id="ptDescription" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11.5px; color:var(--muted);">Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.</div>
       </div>
       <div id="productTypeStatus" style="font-family:'Helvetica Neue',Arial,sans-serif; font-size:11px; color:var(--muted);">Loading…</div>
     </div>
@@ -872,16 +872,33 @@
       }
     });
   }
+  var PT_SUPPLIER_INFO = {
+    tempetyres: {
+      title: 'Tempetyres — wheels vs tyres vs other',
+      description: 'Text-pattern classifier: rim/offset/center-bore notation (e.g. "20x10.0 5x120 ET48 CB73.1"). Not yet checked across the rest of the catalog.'
+    },
+    chapelcorner: {
+      title: 'Chapel Corner — other vs tyre',
+      description: 'Exact match against a human-curated exclusion list (1,766 items — valves, wheel weights, sockets, tools, niche tyres), the same list behind the original snapshot\'s numbers. No separate wheel bucket for this supplier.'
+    }
+  };
+  function updatePtHeader() {
+    var info = PT_SUPPLIER_INFO[ptCurrentKey];
+    document.getElementById('ptTitle').textContent = info.title;
+    document.getElementById('ptDescription').textContent = info.description;
+  }
   document.getElementById('ptSupTempetyres').addEventListener('click', function () {
     this.classList.add('active');
     document.getElementById('ptSupChapelcorner').classList.remove('active');
     ptCurrentKey = 'tempetyres';
+    updatePtHeader();
     loadProductTypeBreakdown();
   });
   document.getElementById('ptSupChapelcorner').addEventListener('click', function () {
     this.classList.add('active');
     document.getElementById('ptSupTempetyres').classList.remove('active');
     ptCurrentKey = 'chapelcorner';
+    updatePtHeader();
     loadProductTypeBreakdown();
   });
 
