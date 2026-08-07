@@ -320,6 +320,13 @@ const NZ_SC_SQL = `
 // hand-curated 31-supplier account set (via the supplier_name -> key allow-list
 // below, extracted from the original static dashboard's own location lists).
 const STOCK_STOCK_TABLE = 'xx_development.popeye_production_au_public_supplier_stock';
+
+// NZ mapped/unmapped report — no curated allow-list yet (unlike AU's
+// STOCK_MAP_NAME_TO_KEY below): every raw supplier_name in the table is shown
+// as its own group until a grouping/exclusion pass is done. See
+// stockMappingSQLNZ / fetchStockMappingNZ.
+const STOCK_STOCK_TABLE_NZ = 'xx_development.popeye_production_nz_public_supplier_stock';
+
 const STOCK_MAP_NAME_TO_KEY = {
   "Tempetyres VIC": "tempetyres", "Tempetyres QLD": "tempetyres", "Tempetyres NSW": "tempetyres",
   "Tempetyres": "tempetyres", "Tempetyres SA": "tempetyres", "Tempetyres WA": "tempetyres",
@@ -515,6 +522,43 @@ async function fetchStockMapping() {
   for (const r of rows) {
     const key = STOCK_MAP_NAME_TO_KEY[r.supplier_name];
     if (!key) continue; // outside the curated set
+    const n = Number(r.n) || 0;
+    const matched = r.match_status === 'matched';
+    const g = byKey[key] || (byKey[key] = { key, matched: 0, unmatched: 0, total: 0, locs: {} });
+    const loc = g.locs[r.supplier_name] || (g.locs[r.supplier_name] = { name: r.supplier_name, matched: 0, unmatched: 0, total: 0 });
+    if (matched) { g.matched += n; loc.matched += n; } else { g.unmatched += n; loc.unmatched += n; }
+    g.total += n; loc.total += n;
+  }
+  return Object.keys(byKey).map(k => {
+    const g = byKey[k];
+    return {
+      key: g.key, matched: g.matched, unmatched: g.unmatched, total: g.total,
+      locations: Object.keys(g.locs).map(nm => g.locs[nm]).sort((a, b) => b.total - a.total)
+    };
+  }).sort((a, b) => b.total - a.total);
+}
+
+// NZ mapped/unmapped report. Unlike stockMappingSQL() above, this has no
+// supplier_name allow-list — the NZ curation pass (grouping locations under a
+// brand key, excluding dummy/test accounts) hasn't been done yet, so every
+// raw account in the table is queried and shown as its own group.
+function stockMappingSQLNZ() {
+  return 'SELECT supplier_name, match_status, COUNT(*) AS n\n' +
+    'FROM `' + PROJECT_ID + '.' + STOCK_STOCK_TABLE_NZ + '`\n' +
+    "WHERE qty > 0 AND supplier_pid NOT LIKE r'DELETED\\_%'\n" +
+    'GROUP BY supplier_name, match_status';
+}
+
+// Same {key, matched, unmatched, total, locations[]} shape as
+// fetchStockMapping() above, but key = raw supplier_name (no rollup), so each
+// group currently has exactly one location — expected until a name->key map
+// exists for NZ.
+async function fetchStockMappingNZ() {
+  const rows = await runBQQuery(stockMappingSQLNZ());
+  const byKey = {};
+  for (const r of rows) {
+    const key = r.supplier_name;
+    if (!key) continue;
     const n = Number(r.n) || 0;
     const matched = r.match_status === 'matched';
     const g = byKey[key] || (byKey[key] = { key, matched: 0, unmatched: 0, total: 0, locs: {} });
@@ -1368,6 +1412,25 @@ const server = http.createServer(async(req,res)=>{
     return;
   }
 
+  // /api/stock-mapping-nz — live NZ supplier stock-mapping data. No curated
+  // grouping yet (see fetchStockMappingNZ) — raw accounts, unfiltered.
+  if (req.method==='GET' && url.pathname==='/api/stock-mapping-nz') {
+    try {
+      const data = await fetchStockMappingNZ();
+      let refreshed_at = null;
+      try {
+        const t = await runBQQuery('SELECT CAST(MAX(refreshed_at) AS STRING) AS refreshed_at FROM `' + PROJECT_ID + '.' + STOCK_STOCK_TABLE_NZ + '`');
+        refreshed_at = (t[0] && t[0].refreshed_at) || null;
+      } catch(e) { /* timestamp is best-effort */ }
+      const totals = data.reduce((a,d)=>{ a.matched+=d.matched; a.unmatched+=d.unmatched; a.total+=d.total; return a; }, {matched:0,unmatched:0,total:0});
+      sendJSON(res, 200, { ok:true, generated_at:new Date().toISOString(), refreshed_at, suppliers:data.length, totals, data });
+    } catch(e) {
+      const isAuth = /NOT_AUTHENTICATED|UNAUTHENTICATED|invalid_grant|reauth/i.test(e.message||'');
+      sendJSON(res, isAuth?401:500, { ok:false, error:e.message, hint: isAuth ? 'Run Setup_BigQuery_Auth.bat (gcloud auth application-default login), then restart StockMatch.' : undefined });
+    }
+    return;
+  }
+
   // /api/stock-mapping/rows — row-level export (CSV/Excel) for selected supplier(s) + status
   if (req.method==='GET' && url.pathname==='/api/stock-mapping/rows') {
     try {
@@ -1407,6 +1470,14 @@ const server = http.createServer(async(req,res)=>{
     const f = path.join(__dirname, 'supplier_stock_match_dashboard_live.html');
     if (fs.existsSync(f)){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(fs.readFileSync(f));}
     else{res.writeHead(404);res.end('supplier_stock_match_dashboard_live.html not found in: '+__dirname);}
+    return;
+  }
+
+  // Live NZ stock-mapping dashboard page (must precede the .html catch-all below)
+  if (req.method==='GET' && url.pathname==='/supplier_stock_match_dashboard_nz_live.html') {
+    const f = path.join(__dirname, 'supplier_stock_match_dashboard_nz_live.html');
+    if (fs.existsSync(f)){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(fs.readFileSync(f));}
+    else{res.writeHead(404);res.end('supplier_stock_match_dashboard_nz_live.html not found in: '+__dirname);}
     return;
   }
 

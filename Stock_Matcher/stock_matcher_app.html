@@ -269,13 +269,18 @@ select:focus{border-color:var(--ac)}
           <div class="step-body">
             <div class="step-label active" id="slbl1">Stock file</div>
             <div class="step-card open" id="cardStock">
-              <div class="dz" id="dz-s" onclick="document.getElementById('fi-s').click()" ondragover="dzo(event,'dz-s')" ondragleave="dzl('dz-s')" ondrop="dzd(event,'s')">
-                <span class="di">📦</span>
-                <p>Drop stock file(s) here</p>
-                <small>Any supplier · any format · drop multiple files at once — compiled automatically</small>
+              <div class="dz-label">Supplier stock <span style="font-size:10px;font-weight:400;color:var(--tx3)">(live BigQuery — matched + unmatched rows, same feed as the Stock Matching overview)</span></div>
+              <button id="btn-refresh-stock" onclick="refreshStockSnapshot()" style="width:100%;padding:7px 10px;background:var(--ac);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                <span>🔄</span><span id="btn-refresh-stock-lbl">Load stock from BigQuery</span>
+              </button>
+              <div id="stock-key-picker" style="display:none;margin-top:8px">
+                <div style="font-size:11px;color:var(--tx2);margin-bottom:6px">Which supplier?</div>
+                <select id="stock-key-sel" onchange="onStockKeyChange(this.value)"
+                  style="width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:6px 10px;color:var(--tx);font-family:var(--font);font-size:12px;outline:none">
+                  <option value="">— select supplier —</option>
+                </select>
               </div>
-              <input type="file" id="fi-s" accept=".csv,.xlsx,.xls" multiple onchange="loadStockFiles(this.files);this.value=''">
-              <div id="fi-s-info"></div>
+              <div id="fi-s-info" style="margin-top:8px"></div>
             </div>
           </div>
         </div>
@@ -343,9 +348,15 @@ select:focus{border-color:var(--ac)}
                   <!-- Product data -->
                   <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
                     <div class="dz-label">Product data <span style="font-size:10px;font-weight:400;color:var(--tx3)">(optional — adds DP ID suggestions for unmatched rows)</span></div>
+                    <div class="dz" id="dz-p" onclick="document.getElementById('fi-p').click()" ondragover="dzo(event,'dz-p')" ondragleave="dzl('dz-p')" ondrop="dzdProd(event)">
+                      <span class="di">📄</span>
+                      <p>Drop product data file here</p>
+                      <small>CSV or XLSX with a dp_id column</small>
+                    </div>
+                    <input type="file" id="fi-p" accept=".csv,.xlsx,.xls" onchange="loadProd(this.files[0]);this.value=''">
                     <div id="fi-p-info"></div>
-                    <button id="btn-bq-pd" onclick="loadProdFromDrive()" style="margin-top:6px;width:100%;padding:7px 12px;background:var(--ac);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-                      <span style="font-size:14px">📂</span><span id="btn-bq-pd-lbl">Load Product Data from Google Drive</span>
+                    <button id="btn-bq-pd" onclick="loadProdFromDrive()" style="margin-top:8px;width:100%;padding:7px 12px;background:var(--bg4);color:var(--tx2);border:1px solid var(--bd2);border-radius:var(--r);font-size:12px;font-family:var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                      <span style="font-size:14px">📂</span><span id="btn-bq-pd-lbl">Or load from Google Drive</span>
                     </button>
                   </div>
 
@@ -883,11 +894,11 @@ function setStep(n){
 // -- Drag & drop ------------------------------------------------------------
 function dzo(e,id){e.preventDefault();const el=document.getElementById(id);if(el)el.classList.add('dv');}
 function dzl(id){const el=document.getElementById(id);if(el)el.classList.remove('dv');}
-function dzd(e,t){
-  e.preventDefault();const id={s:'dz-s'}[t];if(id)dzl(id);
+// 's' and 'b' drop zones removed — stock now loads from BigQuery only, SC has its own live BQ button.
+function dzdProd(e){
+  e.preventDefault();dzl('dz-p');
   const f=e.dataTransfer.files;
-  if(t==='s')loadStockFiles(f);
-  // 'b' and 'p' drop zones removed — use live BQ and Drive buttons instead
+  if(f&&f.length)loadProd(f[0]);
 }
 function dzd2(e,t){
   e.preventDefault();dzl('dz-soh');
@@ -1188,16 +1199,19 @@ function confirmMapping(){
 function goToMap(){setStep(2);document.getElementById('cardMap').scrollIntoView({behavior:'smooth'});}
 function resetStock(){
   stockRawRows=[];stockHeaders=[];headerSources={};colMapping={};detectedSupplier=null;sohRawRows=[];
-  selectedBqKey='';window._allBqRows=null;
+  selectedBqKey='';window._allBqRows=null;window._allStockBqRows=null;
   // Clear previous results — new stock file means clean slate
   ALL=[];FIL=[];pg=0;selIdx=null;
   updateStats();
   document.getElementById('fi-s-info').innerHTML='';
   document.getElementById('stock-preview').innerHTML='';
-  document.getElementById('fi-s').value='';
   document.getElementById('bq-key-picker').style.display='none';
   document.getElementById('bq-key-sel').innerHTML='<option value="">— select supplier key —</option>';
   document.getElementById('bq-key-info').textContent='';
+  document.getElementById('stock-key-picker').style.display='none';
+  document.getElementById('stock-key-sel').innerHTML='<option value="">— select supplier —</option>';
+  const rsBtn=document.getElementById('btn-refresh-stock');if(rsBtn)rsBtn.disabled=false;
+  const rsLbl=document.getElementById('btn-refresh-stock-lbl');if(rsLbl)rsLbl.textContent='Load stock from BigQuery';
   setStep(1);
 initCacheBanners();
 }
@@ -1206,27 +1220,32 @@ function resetApp(){
   if(ALL.length&&!confirm('Start a new matching? Current results will be cleared.'))return;
   // Clear all data
   stockRawRows=[];stockHeaders=[];headerSources={};colMapping={};detectedSupplier=null;sohRawRows=[];
-  bqRows=[];selectedBqKey='';window._allBqRows=null;
+  bqRows=[];selectedBqKey='';window._allBqRows=null;window._allStockBqRows=null;
   ALL=[];FIL=[];pg=0;selIdx=null;
   // Reset file inputs
-  ['fi-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['fi-p'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   // Reset info panels
   ['fi-s-info','fi-p-info'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
   // Reset stock preview and mapping
   const sp=document.getElementById('stock-preview');if(sp)sp.innerHTML='';
   const mp=document.getElementById('mapping-rows');if(mp)mp.innerHTML='';
-  // Reset key picker
+  // Reset key pickers
   document.getElementById('bq-key-picker').style.display='none';
   document.getElementById('bq-key-sel').innerHTML='<option value="">— select supplier key —</option>';
   document.getElementById('bq-key-info').textContent='';
+  document.getElementById('stock-key-picker').style.display='none';
+  document.getElementById('stock-key-sel').innerHTML='<option value="">— select supplier —</option>';
+  const rsBtn=document.getElementById('btn-refresh-stock');if(rsBtn)rsBtn.disabled=false;
+  const rsLbl=document.getElementById('btn-refresh-stock-lbl');if(rsLbl)rsLbl.textContent='Load stock from BigQuery';
   // Reset run panel
   const rb=document.getElementById('run-btn');if(rb){rb.disabled=true;rb.textContent='▶ Run matching';}
   const rl=document.getElementById('run-log');if(rl)rl.innerHTML='';
   const rp=document.getElementById('run-prog');if(rp)rp.style.display='none';
-  // Remove nav links and unknown tokens tip that appear after run
+  // Remove nav links and unknown tokens tip that appear after run — but stop at
+  // run-prog, which is a permanent template element, not run-generated content.
   ['run-log'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el){let s=el.nextSibling;while(s){const nx=s.nextSibling;if(s.nodeType===1)s.remove();s=nx;}}
+    if(el){let s=el.nextSibling;while(s&&s.id!=='run-prog'){const nx=s.nextSibling;if(s.nodeType===1)s.remove();s=nx;}}
   });
   // Clear results view
   const rt=document.getElementById('results-table');if(rt)rt.innerHTML='';
@@ -1476,6 +1495,86 @@ function _finishSCRefresh(market,rows,allBqRows,allKeys,info,btn,lbl){
   document.getElementById('run-btn').disabled=!stockRawRows.length||!bqRows.length;
 }
 
+
+// ── refreshStockSnapshot — load Step 1 stock rows directly from BigQuery ──
+// Same underlying supplier_stock feed as the live Stock Matching dashboard
+// (xx_development.popeye_production_au_public_supplier_stock via
+// /api/stock-mapping/rows) — both matched and unmatched rows, so this is a
+// direct substitute for uploading a supplier's own stock file.
+async function refreshStockSnapshot(){
+  const btn=document.getElementById('btn-refresh-stock');
+  const lbl=document.getElementById('btn-refresh-stock-lbl');
+  const info=document.getElementById('fi-s-info');
+  const isLocalhost=(location.hostname==='localhost'||location.hostname==='127.0.0.1');
+
+  if(!isLocalhost){
+    info.innerHTML='<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:14px;font-size:12px"><div style="font-weight:600;margin-bottom:8px">🔄 Start the server first</div><ol style="margin:0 0 8px 16px;padding:0;color:var(--tx2);line-height:2"><li>Double-click <b>StockMatch Tyroola</b> on your desktop</li><li>Click Load again once the browser opens at localhost:3000</li></ol></div>';
+    return;
+  }
+
+  btn.disabled=true; lbl.textContent='Loading…';
+  info.innerHTML='<div class="fb" style="color:var(--tx2);padding:4px 0"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--ac2);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Querying BigQuery for supplier stock…</div>';
+
+  try{
+    const r=await fetch('/api/stock-mapping/rows?status=all',{signal:AbortSignal.timeout(120000)});
+    let d;
+    try{ d=await r.json(); }
+    catch(e){ throw new Error('Server not responding — is StockMatch running?'); }
+    if(r.status===401||d.error==='NOT_AUTHENTICATED') throw new Error('NOT_AUTHENTICATED');
+    if(!r.ok||!d.ok) throw new Error(d.error||'Server error '+r.status);
+    if(!d.rows||!d.rows.length) throw new Error('BigQuery returned 0 rows');
+
+    window._allStockBqRows=d.rows;
+    const keys=[...new Set(d.rows.map(row=>row.supplier_key).filter(Boolean))].sort();
+    const sel=document.getElementById('stock-key-sel');
+    sel.innerHTML='<option value="">— select supplier —</option>'+keys.map(k=>`<option value="${k}">${k}</option>`).join('');
+    document.getElementById('stock-key-picker').style.display='block';
+    info.innerHTML=`<div class="file-loaded"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div class="fl-icon">✓</div><div style="min-width:0">
+      <div class="fl-name">Supplier stock — Live BigQuery</div>
+      <div class="fl-meta">${d.rows.length.toLocaleString()} rows · ${keys.length} suppliers — select supplier below</div>
+    </div></div><button class="fl-btn fl-clr" onclick="resetStock()">Clear</button></div>`;
+    lbl.textContent='Reload from BigQuery'; btn.disabled=false;
+  }catch(err){
+    console.error('[Stock Refresh]',err);
+    if(err.message==='NOT_AUTHENTICATED'){
+      info.innerHTML='<div class="warn" style="line-height:1.8">🔐 <b>Authentication expired</b><br><br>'+
+        'Run this command in a new terminal window:<br>'+
+        '<code style="background:var(--bg3);padding:4px 8px;border-radius:4px;display:inline-block;margin:6px 0">gcloud auth application-default login</code><br>'+
+        'Sign in with <b>emeterio@tyroola.com</b>, then:<br>'+
+        '1. Close and reopen StockMatch<br>'+
+        '2. Click Load again</div>';
+    }else{
+      info.innerHTML='<div class="warn">⚠ '+err.message+'</div>';
+    }
+    btn.disabled=false; lbl.textContent='Load stock from BigQuery';
+  }
+}
+
+function onStockKeyChange(key){
+  if(!key||!window._allStockBqRows)return;
+  const rows=window._allStockBqRows.filter(r=>r.supplier_key===key);
+  stockRawRows=rows;
+  stockHeaders=['supplier_pid','description','qty','price','match_status','supplier_name'];
+  headerSources={};
+  colMapping={vendor_sku:'supplier_pid',description:'description',quantity:'qty'};
+  detectedSupplier=null;
+
+  const matched=rows.filter(r=>r.match_status==='matched').length;
+  document.getElementById('fi-s-info').innerHTML=`<div class="file-loaded"><div style="display:flex;align-items:center;gap:10px;min-width:0"><div class="fl-icon">✓</div><div style="min-width:0">
+    <div class="fl-name">Supplier stock — Live BigQuery</div>
+    <div class="fl-meta">${rows.length.toLocaleString()} rows · key: ${key} · ${matched.toLocaleString()} already mapped, ${(rows.length-matched).toLocaleString()} not mapped</div>
+  </div></div><button class="fl-btn fl-clr" onclick="resetStock()">Clear</button></div>`;
+
+  // If Suppliers Check BQ data is already loaded and has the same key, select it too
+  const scSel=document.getElementById('bq-key-sel');
+  if(scSel && window._allBqRows && [...scSel.options].some(o=>o.value===key)){
+    scSel.value=key; onBqKeyChange(key);
+  }
+
+  setStep(3);
+  onMatchModeChange();
+  setTimeout(()=>document.getElementById('cardBQ').scrollIntoView({behavior:'smooth'}),100);
+}
 
 // ── loadBQAuto — route dropped/browsed file by type ──────────────────────
 function loadBQAuto(file){
@@ -3073,7 +3172,8 @@ function runMatch(){
   if(prodRows.length)buildProdIndex();
 
   // Supplier name and source — derive from selected Suppliers Check key (not detected supplier profile)
-  const fname=document.getElementById('fi-s').files[0]?.name||'stock';
+  // Stock now always comes from BigQuery (no stock file input), so this is just the fallback label.
+  const fname='stock';
   const stockFileName=fname;
   const supplierName = selectedBqKey
     ? selectedBqKey.charAt(0).toUpperCase()+selectedBqKey.slice(1)
@@ -3677,6 +3777,15 @@ function updateStats(){
   const autoMatchedPD=ALL.filter(r=>r['Match Status']==='matched_pd'&&!r['_userAccepted']).length;
   const userMatchedPD=ALL.filter(r=>r['Match Status']==='matched_pd'&&r['_userAccepted']).length;
 
+  const tot=ALL.length;
+  const c={full_desc_match:0,partial_desc_match:0,desc_mismatch:0,not_found:0,matched_pd:0};
+  ALL.forEach(r=>{
+    const s=r['Match Status'];
+    if(s==='accepted_override') c.full_desc_match++; // legacy rows
+    else if(s==='matched_pd') c.matched_pd++;
+    else if(c[s]!==undefined) c[s]++;
+  });
+
   toggleChip('chip-blacklisted', bl,  '⛔ Blacklisted');
   toggleChip('chip-exclusivity', exl, '🔒 Exclusivity');
   toggleChip('chip-wheel',       whl, '⚙ Wheel');
@@ -3688,14 +3797,6 @@ function updateStats(){
   const rcEl=document.getElementById('rules-count');
   if(rcEl)rcEl.textContent=_userRules.length;
 
-  const tot=ALL.length;
-  const c={full_desc_match:0,partial_desc_match:0,desc_mismatch:0,not_found:0,matched_pd:0};
-  ALL.forEach(r=>{
-    const s=r['Match Status'];
-    if(s==='accepted_override') c.full_desc_match++; // legacy rows
-    else if(s==='matched_pd') c.matched_pd++;
-    else if(c[s]!==undefined) c[s]++;
-  });
   const totalFull=c.full_desc_match+c.matched_pd;
   const pct=n=>tot?Math.round(n/tot*100)+'%':'0%';
   let fullLabel=`${totalFull.toLocaleString()}`;
