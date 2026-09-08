@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicles without tyre options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>249,968 vehicles have no tyre options</h1>
+  <p class="standfirst">Every vehicle_id in the log is a car someone looked up. Most resolve to nothing we can fit. This counts the vehicles; request volume only sets the order of work.</p>
+  <p class="meta">322,433 vehicles &nbsp;|&nbsp; 22 Nov 2021 to 1 Sep 2026 &nbsp;|&nbsp; AU and NZ</p>
+
+  <section id="header">
+    <div class="card">
+      <div class="pair">
+        <div class="half"><b class="fitnum">72,465</b><span class="pc">22.5%</span><p>vehicles have tyre sizes on file</p></div>
+        <div class="half"><b class="nonum">249,968</b><span class="pc">77.5%</span><p>vehicles have none</p></div>
+      </div>
+      <div class="stack"><i style="width:22.47%;background:var(--fit)"></i><i style="width:45.55%;background:var(--nofit)"></i><i style="width:30.58%;background:var(--gap)"></i><i style="width:1.40%;background:var(--void)"></i></div>
+      <div class="legend"><div><span class="sw" style="background:var(--fit)"></span><b>72,465</b> <em>vehicles have sizes</em></div><div><span class="sw" style="background:var(--nofit)"></span><b>146,865</b> <em>matched, no sizes</em></div><div><span class="sw" style="background:var(--gap)"></span><b>98,597</b> <em>no matching spec</em></div><div><span class="sw" style="background:var(--void)"></span><b>4,506</b> <em>no make recorded</em></div></div>
+    </div>
+  </section>
+
+  <section id="monthly">
+    <h2>Vehicles logged each month, with and without tyre options</h2>
+    <p class="lede">Each vehicle counted in the month it first appeared in the log. Green has tyre sizes on file, grey has none.</p>
+    <div class="card">
+      <div class="ctrls">
+        <div class="ctrl" role="group" aria-label="Range">
+          <button type="button" data-n="12" class="on">12 months</button>
+          <button type="button" data-n="24">24</button>
+          <button type="button" data-n="36">36</button>
+          <button type="button" data-n="0">All</button>
+        </div>
+        <div class="ctrl" role="group" aria-label="Scale">
+          <button type="button" data-s="clip" class="on">Clip spikes</button>
+          <button type="button" data-s="full">Full scale</button>
+        </div>
+      </div>
+      <div class="plot">
+        <div class="ylab" id="ylab"></div>
+        <div class="parea"><div class="grid" id="grid"></div><div class="chart" id="chart"></div></div>
+      </div>
+      <div class="tickrow"><div class="yspacer"></div><div class="ticks" id="ticks"></div></div>
+      <div class="legend" style="margin-top:20px">
+        <div><span class="sw" style="background:var(--fit)"></span><em>has tyre sizes</em></div>
+        <div><span class="sw" style="background:var(--nofit)"></span><em>no tyre sizes</em></div>
+        <div><em id="chartnote"></em></div>
+      </div>
+      <div class="drill">
+        <p class="hint" id="drillhint">Select a month to break its unfitted vehicles down by type.</p>
+        <p class="hint" id="drillsub" hidden>Types are the vehicle&rsquo;s powertrain. Unknown means the powertrain could not be determined, not that the tyre size is unknown &mdash; every vehicle in this donut is missing tyre sizes.</p>
+        <div class="drillbody" id="drillbody" hidden>
+          <svg class="donut" id="donut" viewBox="0 0 140 140" role="img" aria-labelledby="donuttitle"><title id="donuttitle">Unfitted vehicles by type</title></svg>
+          <div class="drilltext">
+            <h4 id="drilltitle"></h4>
+            <div id="drilllegend"></div>
+            <button type="button" class="clear" id="drillclear">Clear selection</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trend">
+    <h2>What kind of vehicle is missing tyre sizes, over time</h2>
+    <p class="lede">Every vehicle in this chart is already missing tyre sizes. The lines show what those vehicles <em>were</em> &mdash; the make-up of the gap, month by month. <b>Unknown powertrain</b> means the vehicle&rsquo;s own type could not be determined: no engine string in the log and no match in the EV catalogue, almost all of them AU_SCA iframe records with every spec field null.</p>
+    <div class="card">
+      <div class="ctrls">
+        <div class="ctrl" role="group" aria-label="Trend mode">
+          <button type="button" data-t="share" class="on">Percentage mix</button>
+          <button type="button" data-t="count">Vehicle count</button>
+        </div>
+        <div class="ctrl" role="group" aria-label="Trend range">
+          <button type="button" data-r="24">24 months</button>
+          <button type="button" data-r="36">36</button>
+          <button type="button" data-r="0" class="on">All</button>
+        </div>
+      </div>
+      <p class="axistitle" id="taxis"></p>
+      <div class="plot">
+        <div class="ylab" id="tylab"></div>
+        <div class="parea">
+          <div class="grid" id="tgrid"></div>
+          <div class="chart" id="tchart"></div>
+          <svg class="lines" id="tlines" preserveAspectRatio="none" viewBox="0 0 1000 250"></svg>
+        </div>
+      </div>
+      <div class="tickrow"><div class="yspacer"></div><div class="ticks" id="tticks"></div></div>
+      <div class="legend" id="tlegend" style="margin-top:20px"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Three reasons a vehicle has nothing to fit</h2>
+    <p class="lede">The 249,968 unfitted vehicles split into three problems, each with a different owner and a different fix.</p>
+    <div class="modes">
+      <div class="mode"><b>146,865</b><h4>Spec is known, sizes are missing</h4><p>The vehicle matches a row in the fitment table but no tyre sizes are recorded against it. Catalogue work.</p></div>
+      <div class="mode s"><b>98,597</b><h4>Spec never matched</h4><p>Make, model and series do not resolve to any row in the fitment table. Mapping and naming work.</p></div>
+      <div class="mode v"><b>4,506</b><h4>Vehicle never identified</h4><p>No make was captured, so nothing can be looked up. Capture work in the lookup flow.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="stackcards">
+      <div class="card">
+        <h3 class="cardh">Vehicles by type and fitment state</h3>
+        <div class="frows"><div class="frow head"><div>Type</div><div class="num">Vehicles<br><span class="hsub">share of log</span></div><div>Fitment mix</div><div class="num">Fitted<br><span class="hsub">of matched</span></div><div class="num">Unmatched<br><span class="hsub">vehicles</span></div></div><div class="frow"><div class="fname">EV<small>12,766 BEV, 925 plug-in, 850 hybrid</small></div><div class="num strong">14,551<span class="npc">4.5%</span></div><div class="dbar" title="7,488 with sizes &middot; 3,416 matched with none &middot; 3,647 unmatched &middot; 0 no make"><i class="c" style="width:51.46%"></i><i class="n" style="width:23.48%"></i><i class="s" style="width:25.06%"></i><i class="v" style="width:0.00%"></i></div><div class="num strong">69%</div><div class="num sub">3,647</div></div><div class="frow"><div class="fname">Non EV<small>6,994 show a battery but no catalogue match</small></div><div class="num strong">294,434<span class="npc">91.3%</span></div><div class="dbar" title="64,977 with sizes &middot; 143,449 matched with none &middot; 86,008 unmatched &middot; 0 no make"><i class="c" style="width:22.07%"></i><i class="n" style="width:48.72%"></i><i class="s" style="width:29.21%"></i><i class="v" style="width:0.00%"></i></div><div class="num strong">31%</div><div class="num sub">86,008</div></div><div class="frow"><div class="fname">Unknown<small>no engine string, no catalogue match</small></div><div class="num strong">13,448<span class="npc">4.2%</span></div><div class="dbar" title="0 with sizes &middot; 0 matched with none &middot; 8,942 unmatched &middot; 4,506 no make"><i class="c" style="width:0.00%"></i><i class="n" style="width:0.00%"></i><i class="s" style="width:66.49%"></i><i class="v" style="width:33.51%"></i></div><div class="num strong">&mdash;</div><div class="num sub">13,448</div></div><div class="frow total"><div class="fname">All vehicles</div><div class="num strong">322,433<span class="npc">100%</span></div><div class="dbar" title="72,465 with sizes &middot; 146,865 matched with none &middot; 98,597 unmatched &middot; 4,506 no make"><i class="c" style="width:22.47%"></i><i class="n" style="width:45.55%"></i><i class="s" style="width:30.58%"></i><i class="v" style="width:1.40%"></i></div><div class="num strong">33%</div><div class="num sub">103,103</div></div></div>
+        <div class="legend cardleg">
+          <div><span class="sw" style="background:var(--fit)"></span><em>has tyre sizes</em></div>
+          <div><span class="sw" style="background:var(--nofit)"></span><em>matched, no sizes</em></div>
+          <div><span class="sw" style="background:var(--gap)"></span><em>no matching spec</em></div>
+          <div><span class="sw" style="background:var(--void)"></span><em>no make recorded</em></div>
+          <div><em>mix bars are full width, so each type&rsquo;s split reads the same regardless of size</em></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="cardh">When each vehicle was last requested</h3>
+        <div class="plot">
+          <div class="ylab yshort"><span style="top:100.00%">0</span><span style="top:75.00%">50k</span><span style="top:50.00%">100k</span><span style="top:25.00%">150k</span><span style="top:0.00%">200k</span></div>
+          <div class="parea pshort"><div class="grid"><i class="zero" style="top:100.00%"></i><i class="" style="top:75.00%"></i><i class="" style="top:50.00%"></i><i class="" style="top:25.00%"></i><i class="" style="top:0.00%"></i></div><div class="chart"><div class="col" title="2021: 2,596 vehicles, 1 with sizes, 2,595 without"><i class="wo" style="height:1.30%"></i><i class="w" style="height:0.00%"></i></div><div class="col" title="2022: 39,312 vehicles, 122 with sizes, 39,190 without"><i class="wo" style="height:19.60%"></i><i class="w" style="height:0.06%"></i></div><div class="col" title="2023: 18,021 vehicles, 165 with sizes, 17,856 without"><i class="wo" style="height:8.93%"></i><i class="w" style="height:0.08%"></i></div><div class="col" title="2024: 17,750 vehicles, 6,345 with sizes, 11,405 without"><i class="wo" style="height:5.70%"></i><i class="w" style="height:3.17%"></i></div><div class="col" title="2025: 77,203 vehicles, 34,900 with sizes, 42,303 without"><i class="wo" style="height:21.15%"></i><i class="w" style="height:17.45%"></i></div><div class="col" title="2026: 167,551 vehicles, 30,932 with sizes, 136,619 without"><i class="wo" style="height:68.31%"></i><i class="w" style="height:15.47%"></i></div></div></div>
+        </div>
+        <div class="tickrow"><div class="yspacer"></div><div class="ticks yticks"><span>2021</span><span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span></div></div>
+        <div class="legend cardleg">
+          <div><span class="sw" style="background:var(--fit)"></span><em>has tyre sizes</em></div>
+          <div><span class="sw" style="background:var(--nofit)"></span><em>no tyre sizes</em></div>
+          <div><em>one count per vehicle, on its most recent activity</em></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="dl">
+    <div class="txt">
+      <h3>Vehicle log report</h3>
+      <p>25,000 vehicles with two or more requests, ordered by request count from largest to smallest, and by most recent request where counts are equal. Includes make, model, year, engine, EV class, tyre fitment and sizes.</p>
+    </div>
+    <a href="vehicle_log_ev_report.xlsx" download>Download spreadsheet</a>
+  </div>
+
+  <section>
+    <h2>Read these before acting on the counts</h2>
+    <p class="lede">Each was found while building the underlying report. None is blocking, all are worth an owner.</p>
+    <div class="gaps">
+      <div class="gap-item"><h4>Fitted means listed</h4><p>A vehicle counts as fitted when its make, model and series resolve to a fitment row that has tyre sizes against it. That says the sizes exist in the catalogue, not that the customer was shown them. <b>tyre_options</b> is empty on every mirrored row, so the log cannot confirm what was actually served.</p></div>
+      <div class="gap-item"><h4>Empty tyre options</h4><p><b>tyre_options</b> is the literal string <b>[]</b> on all 324,350 mirrored rows. 1,140 rows carry a real tyre_options_added_at timestamp anyway, which says the field was populated upstream and lost in the mirror.</p></div>
+      <div class="gap-item"><h4>Vehicles with no make</h4><p><b>4,506</b> vehicles carry <b>29,540</b> requests, averaging 6.6 each against about 1.0 everywhere else. Every spec field is null, so they can be neither classified nor fitment-checked. They come from the AU_SCA iframe integration, dormant since 8 Dec 2025.</p></div>
+      <div class="gap-item"><h4>Bulk load in mid-2026</h4><p>May and June 2026 hold <b>123,590</b> vehicles between them, 38% of the whole log, against a normal 5,000&ndash;7,000 a month. Almost all are unfitted, which drags every whole-log rate down. Confirm what that load was before quoting the headline.</p></div>
+      <div class="gap-item"><h4>Model names fragment</h4><p>Counts group on the raw model string, so variants split into separate lines. Ford Falcon holds 4,161 vehicles under <b>FALCON</b> and 8 more under seven spellings including two of &ldquo;FALCON GL,S-PAK&rdquo; differing by one space.</p></div>
+      <div class="gap-item"><h4>Unstable vehicle id</h4><p>The fitment table&rsquo;s vehicle_id is documented as session-ephemeral. Of 50,811 ids that match the log, 99.6% agree on make and model but the year rarely does, so the id resolves to the wrong variant. All joins here use make, model and series instead.</p></div>
+      <div class="gap-item"><h4>Reversed timestamps</h4><p>updated_at falls before created_at on <b>313,070</b> of 324,350 rows. Dates here take the later of the two, but per-request timing cannot be trusted until this is explained.</p></div>
+      <div class="gap-item"><h4>Stale fitment snapshot</h4><p>The fitment table is a single snapshot dated <b>16 Jun 2026</b>, three months behind the log. Vehicles first seen after that date can count as unmatched for no other reason.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    Built from popeye_mirror.vehicle_log, RTB.vehicle_catalog_ev_ready and tyroola_reporting_prod.vehicle_tyre_fitment in heroic-ruler-198603. One row per vehicle_id, with requests summed across all stores. Fitment status is resolved on make, model and series, then counted at type level. See queries/ for the SQL behind every figure.
+  </footer>
+
+</div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
