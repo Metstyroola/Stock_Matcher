@@ -48,14 +48,22 @@ bash scripts/extract.sh
 
 Writes `data/raw_edits.json`. Read the row-count reconciliation it prints before continuing.
 
-**The query tool caps at 3,000 rows per call and truncates silently.** `extract.sh` pulls in
-month-sized chunks and splits any month that comes back at exactly 3,000. It then re-queries a
-single aggregate `COUNT(*)` and compares. If the counts disagree, stop and narrow the chunks —
-do not build on a short extract. This has already bitten once: a 16–31 May window came back at
-exactly 3,000 rows and silently dropped the last five days of the month.
+**Row limits truncate silently, and they differ by path.** `extract.sh` pulls in month-sized
+chunks and re-pulls any month that comes back at exactly the limit, day by day. It then re-queries
+a single aggregate `COUNT(*)` and compares. If the counts disagree, stop — do not build on it.
+This has already bitten once: a 16–31 May window came back at exactly 3,000 rows and silently
+dropped the last five days of the month.
 
-If `bq` is unavailable, run the same SQL through the BigQuery MCP connector and write the rows to
-`data/raw_edits.json` in the same shape (`{"cols": [...], "rows": [[...], ...]}`).
+The limit is `MAX_ROWS`, which the script also passes to `bq --max_rows`. It defaults to 100,000,
+which is the `bq` path. **The 3,000-row cap is the BigQuery MCP connector's, not `bq`'s** — if you
+run the same SQL through the connector instead of `bq`, set `MAX_ROWS=3000` or the truncation
+check is looking for a limit that never gets hit. Writing the rows yourself means matching the
+shape `{"cols": [...], "rows": [[...], ...], "extracted": "YYYY-MM-DD"}`; column order does not
+matter, `build.py` looks columns up by name, but the names must match the `SELECT`.
+
+A failed reconciliation says which direction it went. Short means a chunk was truncated: lower
+`MAX_ROWS` to force finer slices. Over means the windows overlap, which is a bug in the chunking
+rather than something to re-run.
 
 ### 2. Build
 

@@ -25,10 +25,19 @@ TEMPLATE = os.path.join(ROOT, 'templates', 'dashboard.html')
 OUT = os.path.join(ROOT, 'docs', 'index.html')
 XLSX_NAME = 'mapped_sku_description_edits.xlsx'
 
+# Workbook column order. Names that are not DERIVED are looked up in the extract by
+# name, so reordering the SELECT in extract.sh cannot shift a column silently.
 HEADERS = ['store_country', 'id_supplier_stock', 'fk_supplier', 'supplier_key', 'Supplier',
            'supplier_pid', 'fk_product_map', 'spinach_pid', 'previous_description',
            'new_description', 'Removed', 'Added', 'Change', 'previous_seen_at', 'changed_at',
            'Month']
+DERIVED = {'Supplier', 'Removed', 'Added', 'Change', 'Month'}
+WIDTHS = {'store_country': 13, 'id_supplier_stock': 17, 'fk_supplier': 12, 'supplier_key': 22,
+          'Supplier': 18, 'supplier_pid': 18, 'fk_product_map': 15, 'spinach_pid': 15,
+          'previous_description': 44, 'new_description': 44, 'Removed': 20, 'Added': 20,
+          'Change': 30, 'previous_seen_at': 19, 'changed_at': 19, 'Month': 10}
+INTS = {'id_supplier_stock', 'fk_supplier', 'fk_product_map'}
+MONO_COLS = {'Removed', 'Added', 'Change'}
 
 
 def parent(key):
@@ -91,8 +100,13 @@ def month_span(first, last):
     return f'{fn} {fy} to {ln} {ly}'
 
 
-def build_workbook(cols, rows, I):
+def build_workbook(rows, I):
     """Detail workbook: one row per edit, with derived Supplier and diff columns."""
+    missing = [h for h in HEADERS if h not in DERIVED and h not in I]
+    if missing:
+        sys.exit(f'Extract has no column named {", ".join(missing)} — '
+                 'the workbook and scripts/extract.sh have drifted apart.')
+
     ARIAL, MONO = 'Arial', 'Consolas'
     hdr_font = Font(name=ARIAL, bold=True, color='FFFFFF', size=10)
     hdr_fill = PatternFill('solid', fgColor='1F3864')
@@ -109,13 +123,12 @@ def build_workbook(cols, rows, I):
                 'and first-time population of the column, are excluded.')
     ws['A2'].font = Font(name=ARIAL, size=9, italic=True, color='595959')
 
-    headers = HEADERS
-    widths = [13, 17, 12, 22, 18, 18, 15, 15, 44, 44, 20, 20, 30, 19, 19, 10]
-    ints = {'id_supplier_stock', 'fk_supplier', 'fk_product_map'}
+    # Column number by name — nothing below counts positions by hand.
+    COL = {h: i + 1 for i, h in enumerate(HEADERS)}
 
     hr = 4
-    for c, h in enumerate(headers, start=1):
-        cell = ws.cell(row=hr, column=c)
+    for h in HEADERS:
+        cell = ws.cell(row=hr, column=COL[h])
         cell.value, cell.font, cell.fill = h, hdr_font, hdr_fill
         cell.alignment = Alignment(vertical='center')
     ws.row_dimensions[hr].height = 20
@@ -123,33 +136,44 @@ def build_workbook(cols, rows, I):
     r_ = hr
     for r in rows:
         r_ += 1
-        base = [None if v is None else (int(v) if nm in ints else v) for nm, v in zip(cols, r)]
         rem, add, compact = word_diff(r[I['previous_description']], r[I['new_description']])
-        vals = base[:4] + [None] + base[4:9] + [rem, add, compact] + base[9:] + [None]
-        for c, v in enumerate(vals, start=1):
-            cell = ws.cell(row=r_, column=c)
+        # Supplier and Month are written as values, not formulas: one implementation of
+        # each rule, and the same one the charts aggregate on. Formulas written by
+        # openpyxl carry no cached result, so pandas and most preview panes read them
+        # as empty.
+        derived = {
+            'Supplier': parent(r[I['supplier_key']]),
+            'Removed': rem,
+            'Added': add,
+            'Change': compact,
+            'Month': r[I['changed_at']][:7],
+        }
+        for h in HEADERS:
+            if h in derived:
+                v = derived[h]
+            else:
+                v = r[I[h]]
+                if v is not None and h in INTS:
+                    v = int(v)
+            cell = ws.cell(row=r_, column=COL[h])
             cell.value = v
-            cell.font = mono if c in (11, 12, 13) else body
+            cell.font = mono if h in MONO_COLS else body
             cell.border = thin
-            if c in (2, 3, 7):
+            if h in INTS:
                 cell.number_format = '0'
-        # Derived as formulas so the rule stays visible and survives editing.
-        ws.cell(row=r_, column=5).value = (
-            f'=LEFT(D{r_},MIN(IFERROR(FIND("-",D{r_}),99),IFERROR(FIND("_",D{r_}),99))-1)')
-        ws.cell(row=r_, column=16).value = f'=LEFT(O{r_},7)'
-        ws.cell(row=r_, column=16).alignment = Alignment(horizontal='center')
+        ws.cell(row=r_, column=COL['Month']).alignment = Alignment(horizontal='center')
 
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+    for h in HEADERS:
+        ws.column_dimensions[get_column_letter(COL[h])].width = WIDTHS[h]
     ws.freeze_panes = 'A5'
-    ws.auto_filter.ref = f'A{hr}:P{r_}'
+    ws.auto_filter.ref = f'A{hr}:{get_column_letter(len(HEADERS))}{r_}'
 
     nt = wb.create_sheet('Notes')
     nt['A1'] = 'Source and scope'
     nt['A1'].font = Font(name=ARIAL, bold=True, size=12)
     notes = [
         ('Scope', 'fk_product_map IS NOT NULL AND previous_description IS NOT NULL'),
-        ('Supplier', 'Derived: supplier_key up to the first "-" or "_". Groups a supplier\'s state '
+        ('Supplier', 'Derived value: supplier_key up to the first "-" or "_". Groups a supplier\'s state '
                      'and branch feeds together. Also folds in non-location variants (promo, '
                      'virtual, special) — keep supplier_key when those must stay separate.'),
         ('Removed / Added / Change', 'Derived by comparing previous_description with '
@@ -190,6 +214,14 @@ def main():
     d = json.load(open(RAW))
     cols, rows = d['cols'], d['rows']
     I = {c: i for i, c in enumerate(cols)}
+
+    # Columns are addressed by name throughout, so a reordered SELECT is harmless and a
+    # renamed one stops the build here rather than shifting data into the wrong column.
+    missing = [h for h in HEADERS if h not in DERIVED and h not in I]
+    if missing:
+        sys.exit(f'Extract has no column named {", ".join(missing)} — scripts/extract.sh '
+                 f'and build.py have drifted apart. Got: {", ".join(cols)}')
+
     SP, SK, CH = I['spinach_pid'], I['supplier_key'], I['changed_at']
 
     if not rows:
@@ -239,7 +271,7 @@ def main():
     date_range = (f'between {pretty(first_iso, with_year=not same_year)} '
                   f'and {pretty(last_iso)}')
 
-    xlsx = build_workbook(cols, rows, I)
+    xlsx = build_workbook(rows, I)
 
     payload = {
         'suppliers': suppliers,
