@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edited SKUs — mapped, 2026</title>
+<style>
+:root{
+  --page:#E7EBEE; --surface:#FFFFFF; --ink:#15202B; --muted:#5E6B76;
+  --rule:#CFD7DD; --accent:#0F5C63; --bar:#3E5A6B; --bar-2:#DCE3E9;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 64px}
+h1{font-size:28px;line-height:1.15;font-weight:640;letter-spacing:-.015em;margin:0 0 6px}
+h2{font-size:15px;font-weight:640;margin:0;letter-spacing:-.005em}
+p.sub{margin:0;color:var(--muted);font-size:13px;max-width:76ch}
+header{border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:18px}
+.stats{display:flex;flex-wrap:wrap;gap:26px;margin-top:16px}
+.stat b{display:block;font-size:22px;font-weight:640;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:16px 18px;margin-bottom:16px}
+.hd{margin-bottom:12px}
+.hd p{margin:2px 0 0;color:var(--muted);font-size:12.5px;max-width:74ch}
+svg{display:block;width:100%;overflow:visible}
+svg text{font-family:var(--sans);fill:var(--muted);font-size:11px}
+svg text.val{fill:var(--ink);font-variant-numeric:tabular-nums}
+rect.mb:hover{fill:var(--accent)}
+.dl{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center}
+.dl h2{font-size:17px}
+.dl p{margin:6px 0 0;color:var(--muted);font-size:13px;max-width:62ch}
+.dl ul{margin:10px 0 0;padding:0;list-style:none;color:var(--muted);font-size:12.5px}
+.dl li{padding:2px 0;border-bottom:1px solid var(--rule);display:flex;
+  justify-content:space-between;gap:16px;max-width:52ch}
+.dl li:last-child{border-bottom:0}
+.dl li b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dl code{font-family:var(--mono);font-size:12px}
+button.get{font:inherit;font-size:14px;font-weight:600;padding:13px 22px;border:0;
+  background:var(--accent);color:#fff;border-radius:3px;cursor:pointer;white-space:nowrap}
+button.get:hover{background:#0B474C}
+button.get:disabled{background:var(--muted);cursor:default}
+.fine{margin-top:8px;font-size:12px;color:var(--muted);text-align:right}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+footer{margin-top:22px;color:var(--muted);font-size:12px;border-top:1px solid var(--rule);
+  padding-top:14px;max-width:78ch}
+@media (max-width:860px){
+  h1{font-size:23px}
+  .dl{grid-template-columns:1fr}
+  .fine{text-align:left}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Mapped SKUs with edited descriptions</h1>
+  <p class="sub">Products whose supplier description was changed <span id="range"></span>. Counts SKUs, not rows: one product edited in several supplier feeds counts once. Excludes rows with no product mapping, and excludes the column being populated for the first time.</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<section class="panel">
+  <div class="hd"><h2>Edited SKUs by supplier</h2>
+    <p>Distinct products each supplier changed. A product carried by two suppliers counts under both, so these add up to more than the total.</p></div>
+  <div id="chart-supplier"></div>
+</section>
+
+<section class="panel">
+  <div class="hd"><h2>Edited SKUs by month</h2>
+    <p>Distinct products changed in each month. A product edited in March and again in July appears in both. <span id="partial-blurb"></span></p></div>
+  <div id="chart-month"></div>
+</section>
+
+<section class="panel">
+  <div class="dl">
+    <div>
+      <h2>Every edit, as a spreadsheet</h2>
+      <p>The full detail behind these charts: every edit, with the previous and new description and the words that changed.</p>
+      <ul id="counts"></ul>
+    </div>
+    <div>
+      <button class="get" id="get">Download the spreadsheet</button>
+      <div class="fine" id="fine"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+Source: heroic-ruler-198603.popeye_mirror.supplier_description_change_log, extracted <span id="extracted"></span>.
+The table was backfilled once and does not refresh, so this is a fixed snapshot.
+fk_product_map reflects the mapping as it stood when each change was captured, not today.
+Supplier is supplier_key up to the first hyphen or underscore, so a supplier's separate feeds are
+counted together.
+</footer>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script id="xlsx" type="text/plain">__XLSX__</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const fmt = n => n.toLocaleString('en-AU');
+const $ = id => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (n, a) => { const e = document.createElementNS(SVGNS, n);
+  for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+const S = D.stats, META = D.meta;
+$('stats').innerHTML = [
+  [fmt(S.skus), 'SKUs edited'],
+  [fmt(S.edits), 'edits in total'],
+  [fmt(S.suppliers), 'suppliers']
+].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('');
+
+$('range').textContent = META.dateRange;
+$('extracted').textContent = META.extracted;
+$('fine').textContent = `Excel workbook, ${fmt(META.xlsxKb)} KB`;
+$('counts').innerHTML = [
+  ['Rows', `${fmt(S.edits)} edits`],
+  ['SKUs', fmt(S.skus)],
+  ['Suppliers', fmt(S.suppliers)],
+  ['Columns', `${META.columns}, filter-ready`]
+].map(([k, v]) => `<li><span>${k}</span><b>${v}</b></li>`).join('');
+
+$('partial-blurb').textContent = META.partial >= 0
+  ? `The last month is incomplete (${META.partialNote}), so its bar is hatched and left out of the average.`
+  : 'Every month shown is complete.';
+
+function supplierChart() {
+  const list = D.suppliers, rowH = 23, w = 1000, labelW = 132, valW = 76;
+  const h = list.length * rowH + 4;
+  const max = Math.max(...list.map(s => s.skus));
+  const scale = w - labelW - valW;
+  const svg = el('svg', { viewBox: `0 0 ${w} ${h}` });
+  list.forEach((s, i) => {
+    const y = i * rowH + 2, bh = rowH - 9;
+    const t = el('text', { x: 0, y: y + bh - 1, class: 'val' });
+    t.textContent = s.p; t.setAttribute('font-size', '12'); svg.appendChild(t);
+    const bw = Math.max(scale * s.skus / max, 1);
+    const r = el('rect', { x: labelW, y, width: bw, height: bh, fill: 'var(--bar)' });
+    r.appendChild(el('title')).textContent =
+      `${s.p}: ${fmt(s.skus)} SKUs edited, ${fmt(s.edits)} edits`;
+    svg.appendChild(r);
+    const v = el('text', { x: labelW + bw + 8, y: y + bh - 1, class: 'val' });
+    v.textContent = fmt(s.skus); svg.appendChild(v);
+  });
+  $('chart-supplier').appendChild(svg);
+}
+
+function monthChart() {
+  const M = D.months;
+  const w = 1000, h = 250, padL = 46, padR = 10, padT = 24, padB = 40;
+  const plotH = h - padT - padB, plotW = w - padL - padR;
+  const raw = Math.max(...M.map(m => m.skus));
+  const step = 200, top = Math.ceil(raw / step) * step;
+  const y = v => h - padB - (v / top) * plotH;
+  const slot = plotW / M.length, bw = slot * 0.6;
+  const NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // Which month is short, the average, and the words for both are all derived in
+  // build.py from the data's max changed_at. -1 means every month is complete.
+  const partial = META.partial;
+  const avg = META.avg;
+
+  const svg = el('svg', { viewBox: `0 0 ${w} ${h}` });
+  const defs = el('defs');
+  const pat = el('pattern', { id: 'part', width: 6, height: 6,
+    patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat.appendChild(el('rect', { width: 6, height: 6, fill: 'var(--bar-2)' }));
+  pat.appendChild(el('rect', { width: 2.4, height: 6, fill: 'var(--bar)', opacity: .55 }));
+  defs.appendChild(pat); svg.appendChild(defs);
+
+  for (let v = 0; v <= top; v += step) {
+    svg.appendChild(el('line', { x1: padL, x2: w - padR, y1: y(v), y2: y(v),
+      stroke: v === 0 ? 'var(--ink)' : 'var(--rule)', 'stroke-width': v === 0 ? 1 : 1 }));
+    const t = el('text', { x: padL - 9, y: y(v) + 4, 'text-anchor': 'end' });
+    t.textContent = fmt(v); svg.appendChild(t);
+  }
+
+  if (avg !== null) {
+    svg.appendChild(el('line', { x1: padL, x2: w - padR, y1: y(avg), y2: y(avg),
+      stroke: 'var(--accent)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
+    const al = el('text', { x: w - padR, y: y(avg) - 7, 'text-anchor': 'end' });
+    al.setAttribute('fill', 'var(--accent)');
+    al.textContent = `${fmt(avg)} a month on average, ${META.avgRange}`;
+    svg.appendChild(al);
+  }
+
+  M.forEach((m, i) => {
+    const x = padL + i * slot + (slot - bw) / 2;
+    const isPart = i === partial;
+    const r = el('rect', { x, y: y(m.skus), width: bw, height: h - padB - y(m.skus),
+      fill: isPart ? 'url(#part)' : 'var(--bar)' });
+    if (!isPart) r.setAttribute('class', 'mb');
+    r.appendChild(el('title')).textContent =
+      `${m.m}: ${fmt(m.skus)} SKUs edited, ${fmt(m.edits)} edits` +
+      (isPart ? ` — ${META.partialNote}` : '');
+    svg.appendChild(r);
+
+    const v = el('text', { x: x + bw / 2, y: y(m.skus) - 7, 'text-anchor': 'middle', class: 'val' });
+    v.setAttribute('font-size', '12'); v.textContent = fmt(m.skus); svg.appendChild(v);
+
+    const l = el('text', { x: x + bw / 2, y: h - padB + 17, 'text-anchor': 'middle' });
+    l.textContent = NAMES[+m.m.slice(5) - 1];
+    if (isPart) l.setAttribute('fill', 'var(--muted)');
+    svg.appendChild(l);
+    if (isPart) {
+      const n = el('text', { x: x + bw / 2, y: h - padB + 30, 'text-anchor': 'middle' });
+      n.setAttribute('font-size', '10'); n.textContent = META.partialTick; svg.appendChild(n);
+    }
+  });
+
+  $('chart-month').appendChild(svg);
+}
+
+const FILE = "__FILE__";
+$('get').addEventListener('click', () => {
+  try {
+    const b64 = document.getElementById('xlsx').textContent.trim();
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const blob = new Blob([buf], { type:
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = FILE;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    $('fine').textContent = 'The download did not start. Open this page from a saved copy of the file rather than a preview pane.';
+  }
+});
+
+supplierChart(); monthChart();
+</script>
+</body>
+</html>

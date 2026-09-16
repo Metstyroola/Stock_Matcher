@@ -1,0 +1,55 @@
+name: Deploy dashboard to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it — a half-deployed page is worse
+# than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the build is intact
+        run: |
+          test -f docs/index.html || { echo "docs/index.html missing"; exit 1; }
+          python3 - <<'EOF'
+          import re, base64, io, os, sys
+          h = open('docs/index.html').read()
+          m = re.search(r'<script id="xlsx" type="text/plain">(.*?)</script>', h, re.S)
+          if not m:
+              sys.exit('No embedded workbook — the build did not complete.')
+          blob = base64.b64decode(m.group(1).strip())
+          if blob[:2] != b'PK':
+              sys.exit('Embedded workbook is not a valid xlsx.')
+          left = [t for t in ('__DATA__', '__XLSX__', '__FILE__') if t in h]
+          if left:
+              sys.exit(f'Template placeholders left unfilled: {", ".join(left)}')
+          print(f'ok — {os.path.getsize("docs/index.html")/1e6:.2f} MB page, '
+                f'{len(blob)/1e3:.0f} KB workbook')
+          EOF
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
