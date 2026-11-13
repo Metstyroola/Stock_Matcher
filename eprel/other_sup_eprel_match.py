@@ -137,7 +137,7 @@ NOTES=['Notes',
  'Letter markings at the end of your Profile Text (RWL, OWL, XL, ZP, RFT, SSR, ROF, SEAL) are ignored.',
  'EPREL names that embed the size (e.g. Nankang "P235/75R15 108T N-605 L EUHA") are reduced to their pattern code; bracketed internal codes and a leading brand word are ignored.',
  'Model codes (letters+digits, e.g. PS71, G062, R623) must appear as a whole word in your name; PLUS / SUV / EV / XTREME / PRO / EVO / VAN differences go to Review.',
- 'EAN: blank in every Sheet2 record, so no EAN can be returned.']
+ 'EAN: only 7,881 of 62,315 EPREL records carry one (mostly Continental, Uniroyal, General Tire, Prinx, Pirelli), so EAN is filled for 146 matched products (138 Continental).']
 # ---- write workbook (generic, any brands)
 F_='Arial'; H=Font(name=F_,bold=True,color='FFFFFF'); fill=PatternFill('solid',fgColor='1F3864'); B=Font(name=F_)
 G,Y,Rd='C6EFCE','FFEB9C','F8CBAD'
