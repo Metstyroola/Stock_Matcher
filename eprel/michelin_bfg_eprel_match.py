@@ -38,13 +38,33 @@ def nd(t):
     if not p: return ''
     size=re.sub(r'[^0-9/R.]','',p[0]); sv=p[1] if len(p)>1 else ''
     return f"{size} {re.sub(r'[^0-9]','',sv.split('/')[0])}{re.sub(r'[^A-Z]','',sv[-1:])}"
+def parse(t):
+    p=str(t or '').upper().replace('(',' ').replace(')',' ').split()
+    if not p: return '',set(),''
+    size=re.sub(r'[^0-9/R.]','',p[0]); lis=set(); sp=''
+    for i,tk in enumerate(p[1:],1):
+        m=re.fullmatch(r'(\d{2,3}(?:/\d{2,3})*)([A-Z]?)',tk)
+        if m and not lis:
+            lis=set(m.group(1).split('/')); sp=m.group(2)
+            if not sp and i+1<len(p) and re.fullmatch(r'[A-Z]',p[i+1]): sp=p[i+1]
+        elif m and lis and not sp and m.group(2): sp=m.group(2)
+        elif not lis and not sp and tk in ('Z','ZR'): sp='Z'
+    return size,lis,sp
+def keys(t):
+    size,lis,sp=parse(t); return [f"{size} {li}{sp}" for li in sorted(lis)] or [f"{size} "]
 idx=collections.defaultdict(list); idx2=collections.defaultdict(list)
 for e in E:
-    b,oe,var=eprel_base(e[ix['Commercial Name']]); _k=nd(e[ix['DIMENSIONS']]); _c=dict(r=e,base=b,oe=oe,var=var)
-    idx[(str(e[ix['Brand Clean']]).upper(),_k)].append(_c); idx2[(str(e[ix['Brand Clean']]).upper(),_k.split(' ')[0])].append(_c)
+    b,oe,var=eprel_base(e[ix['Commercial Name']]); _c=dict(r=e,base=b,oe=oe,var=var); _br=str(e[ix['Brand Clean']]).upper()
+    _ks=set(keys(e[ix['Tyre Designation']])) | set(keys(e[ix['DIMENSIONS']]))
+    for _k in _ks: idx[(_br,_k)].append(_c)
+    idx2[(_br,_ks.pop().split(' ')[0])].append(_c)
 out=[]
 for b,p,pt,dim,spid,dpid,seg in LST:
-    k=nd(dim); cands=idx.get((str(b).strip().upper(),k),[]); lb=nn(list_base(pt)); poe,pac=pmarks(p)
+    kk=keys(dim); k=' / '.join(kk); _seen=set(); cands=[]
+    for _k in kk:
+        for c in idx.get((str(b).strip().upper(),_k),[]):
+            if id(c) not in _seen: _seen.add(id(c)); cands.append(c)
+    lb=nn(list_base(pt)); poe,pac=pmarks(p)
     same=[c for c in cands if nn(c['base'])==lb]
     succ=[c for c in cands if nn(c['base'])==lb+'PLUS'] if not same else []
     def sc(c):
@@ -61,8 +81,8 @@ for b,p,pt,dim,spid,dpid,seg in LST:
         mt='Matched - pattern + OE' if best[0]['oe']==poe else ('Matched - pattern, different OE variant' if poe or best[0]['oe'] else 'Matched - pattern')
         if best[0]['oe']==poe and not poe: mt='Matched - pattern'
     elif succ: mt='Review - only PLUS (successor) version in EPREL'
-    elif [c for c in idx2.get((str(b).strip().upper(),k.split(' ')[0]),[]) if nn(c['base']) in (lb, lb+'PLUS')]:
-        alt=[c for c in idx2[(str(b).strip().upper(),k.split(' ')[0])] if nn(c['base']) in (lb, lb+'PLUS')]
+    elif [c for c in idx2.get((str(b).strip().upper(),kk[0].split(' ')[0]),[]) if nn(c['base']) in (lb, lb+'PLUS')]:
+        alt=[c for c in idx2[(str(b).strip().upper(),kk[0].split(' ')[0])] if nn(c['base']) in (lb, lb+'PLUS')]
         top=max(sc(c) for c in alt); best=[c for c in alt if sc(c)==top]
         mt='Review - same pattern & size, different load/speed'
     elif cands: mt='No match - pattern not registered at this size'
@@ -120,7 +140,7 @@ s[f'E{t}']=f'=D{t}/D{t}'; s[f'E{t}'].number_format='0.0%'
 for c in s[t]: c.font=Font(name=F,bold=True)
 notes=['Notes',
  'Source: for_matching_eu_label_michelin_bfg.xlsx - Sheet1 (1,439 products: 1,223 Michelin, 216 BFGoodrich) vs Sheet2 (5,898 EPREL records: 4,525 Michelin, 1,373 BFGoodrich; blank rows ignored). Brand must match.',
- 'Size key: width/profile/rim + first load index + speed (195/80R15 108/106S = 195/80R15 108S; ZR = R).',
+ 'Size key: width/profile/rim + load index + speed. Dual load indexes match either value: 205/55R16 94W = 205/55R16 96/94W (and vice versa). ZR = R; brackets ignored.',
  'Pattern: EPREL OE/variant suffixes (MO, MO1, N0, *, AO, VOL, A=acoustic, ST, S1, DT, VM, VG ...) are removed before comparing to Profile Text.',
  'Letter markings at the end of Profile Text (RWL, OWL, XL, ZP) are ignored. Pattern aliases used: PILOT SPORT PS3 = PILOT SPORT 3; PRIMACY 3ST = PRIMACY 3; PRIMACY 4 ST = PRIMACY 4; E PRIMACY ST = E PRIMACY.',
  'OE variant: picked by comparing the OE mark in your Profile (e.g. "MO Mercedes", "N0 Porsche", "* BMW") with the EPREL suffix.',
